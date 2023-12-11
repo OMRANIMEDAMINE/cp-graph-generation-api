@@ -62,8 +62,3 @@ solve_symmetric_graph_generation(degrees)
 
 
 
-
-
-
-
-
