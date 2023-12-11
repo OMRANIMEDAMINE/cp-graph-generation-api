@@ -44,6 +44,7 @@ def solve_symmetric_graph_generation(degrees):
         for j in range(i + 1, num_nodes):
             model.Add(grid[(i, j)] == grid[(j, i)])
 
+
     # Solve and print out the solution.
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
@@ -56,7 +57,7 @@ def solve_symmetric_graph_generation(degrees):
 
 
 # Example usage:
-degrees = [2, 2, 2, 3, 4, 4, 4, 4, 4]
+degrees = [2, 2, 2, 4, 4, 4, 4, 4, 4]
 solve_symmetric_graph_generation(degrees)
 
 
