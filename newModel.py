@@ -30,13 +30,8 @@ def solve_symmetric_graph_generation(degrees):
 
                     model.AddBoolOr([contains_i, contains_k])
 
-    # Additional constraints for the sum of appeared indices
-    for i in line:
-        appeared_indices_sum = model.NewIntVar(0, num_nodes - 1, f"appeared_indices_sum_{i}")
-        model.Add(appeared_indices_sum == sum(neighbors[i]))
-
-        model.Add(appeared_indices_sum == degrees[i])
-
+        # Constraints to ensure the sum of appeared indices for each vertex is equal to its degree
+     #--> to do
 
     # Symmetry constraints VALID JUST NOT SAME RANGE or LEN ERROR
     # for i in line:
