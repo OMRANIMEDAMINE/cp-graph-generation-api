@@ -16,8 +16,7 @@
 
 from ortools.sat.python import cp_model
 
-
-def solve_graph_generation():
+def solve_graph_generation(deg):
     """Solves the sudoku problem with the CP-SAT solver."""
     # Create the model.
     model = cp_model.CpModel()
@@ -40,7 +39,6 @@ def solve_graph_generation():
     ]
 
 
-    deg = [2, 2, 3, 3, 4, 4, 4, 4, 4]
 
     grid = {}
     for i in line:
@@ -100,5 +98,6 @@ def solve_graph_generation():
     else:
         print("No solution")
     
+deg = [2, 2, 3, 3, 4, 4, 4, 4, 4]
 
-solve_graph_generation()
+solve_graph_generation(deg)
