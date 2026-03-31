@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>edu.polytech</groupId>
+    <artifactId>CP-Molgen-API</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>CP-Molgen-API</name>
+    <description>CP-Molgen-API</description>
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+    <repositories>
+        <!-- Other repositories -->
+        <!--
+        <repository>
+           <id>jena-bio-repo</id>
+           <url>https://bio.informatik.uni-jena.de/repository/libs-release-oss/</url>
+       </repository>
+
+
+       <repository>
+           <id>jena-bio-repo</id>
+           <url>http://nexus.onesaitplatform.com/nexus/content/repositories/releases/</url>
+       </repository>
+
+-->
+
+
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- <dependency>
+            <groupId>ilog</groupId>
+            <artifactId>oplall</artifactId>
+            <version>y12.6</version>
+            <scope>system</scope>
+            <systemPath>${basedir}/DLL/oplall.jar</systemPath>
+        </dependency>-->
+               <!-- <dependency>
+                    <groupId>ilog</groupId>
+                    <artifactId>oplall</artifactId>
+                    <version>12.8</version>
+                    <scope>system</scope>
+                    <systemPath>${basedir}/libs/oplall-12.8.jar</systemPath>
+                </dependency>
+
+                <dependency>
+                    <groupId>ilog</groupId>
+                    <artifactId>cplex</artifactId>
+                    <version>12.8</version>
+                    <scope>system</scope>
+                    <systemPath>${basedir}/libs/cplex-12.8.jar</systemPath>
+                </dependency>-->
+
+
+        <!-- https://mvnrepository.com/artifact/cplex/cplex -->
+<!--        <dependency>
+            <groupId>cplex</groupId>
+            <artifactId>cplex</artifactId>
+            <version>12.7.1</version>
+        </dependency>-->
+
+        <!--
+                <dependency>
+                    <groupId>cplex.maven</groupId>
+                    <artifactId>oplall</artifactId>
+                    <version>12.8</version>
+                </dependency>
+        -->
+
+
+
+    </dependencies>
+
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+             </plugin>
+        </plugins>
+    </build>
+
+</project>

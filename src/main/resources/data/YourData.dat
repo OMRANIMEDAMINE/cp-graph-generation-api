@@ -1,0 +1,8 @@
+// YourData.dat
+
+numItems = 3; // Set the number of items
+
+// Data for each item
+Value = [10, 8, 15];  // Value of each item
+Weight = [5, 3, 7];   // Weight of each item
+MaxWeight = 10;       // Set the maximum weight capacity
