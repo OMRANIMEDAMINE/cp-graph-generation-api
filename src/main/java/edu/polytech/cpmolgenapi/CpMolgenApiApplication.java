@@ -23,14 +23,13 @@ public class CpMolgenApiApplication {
 
             Result optLex =  OpLexVsOpRevLexVsHybrid.testOptimizedLex(sample.degrees); // With CanonicalChecker
             Result optRevLex = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(sample.degrees);
-            //Result optLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(sample.degrees);
-            //Result optRevLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(sample.degrees);;
-            Result optRevLexConDiagRev =optLex;//   OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(sample.degrees);
+            Result optLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(sample.degrees);
+            Result optRevLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(sample.degrees);;
+            Result optRevLexConDiagRev =  OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(sample.degrees);
 
-
-            Result optLexCon = optLex;// OpLexVsOpRevLexVsHybrid.testOptimizedLexConKKtree(sample.degrees);
+            //Result optLexCon =   OpLexVsOpRevLexVsHybrid.testOptimizedLexConKKtree(sample.degrees);
             System.out.println("***********\n");
-            Result optRevLexCon = optLex;//  OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConKKtree(sample.degrees);;
+            //Result optRevLexCon =    OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConKKtree(sample.degrees);;
 
             // Analyze isomorphism rates for each output file
             /*IsomorphismData isoLex = analyzeIsomorphism("output_testLex.txt");
@@ -40,8 +39,8 @@ public class CpMolgenApiApplication {
                 printResults(sample.name, Lex, RevLex, optLex, optRevLex,
                     isoLex, isoRevLex, isoOptLex, isoOptRevLex);
 */
-            //printResults(sample.name, optLex, optRevLex, optLexCon, optRevLexCon, optRevLexConDiagRev);
-            printResults(sample.name, Lex, RevLex, AntiLex, Snake, optRevLexConDiagRev);
+            printResults(sample.name, optLex, optRevLex, optLexCon, optRevLexCon, optRevLexConDiagRev);
+
         }
         System.out.printf("\n ********* End of Experimentation  **************   \n");
     }

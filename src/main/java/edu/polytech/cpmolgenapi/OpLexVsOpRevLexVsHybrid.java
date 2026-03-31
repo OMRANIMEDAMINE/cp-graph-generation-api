@@ -339,14 +339,30 @@ public class OpLexVsOpRevLexVsHybrid {
 
             // Constraint 3: Symmetry breaking Opt Lex
             /* OK WORKS FINE*/
+            // Double Lex: Lex on rows + Lex on columns
             for (int i = 0; i < N-1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if ((DEGREE[i] == DEGREE[j])) {
-                        cp.add(cp.lexicographic(MATRIX[i], MATRIX[j]));
+                for (int j = i+1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+                        cp.add(cp.lexicographic(MATRIX[i], MATRIX[j]));           // Rows
                     }
                 }
             }
 
+
+
+           /*
+            // Lex on columns (by transposing logic)
+            for (int i = 0; i < N-1; i++) {
+                for (int j = i+1; j < N; j++) {
+                    IloIntVar[] colI = new IloIntVar[N];
+                    IloIntVar[] colJ = new IloIntVar[N];
+                    for (int k = 0; k < N; k++) {
+                        colI[k] = MATRIX[k][i];
+                        colJ[k] = MATRIX[k][j];
+                    }
+                    cp.add(cp.lexicographic(colI, colJ));
+                }
+            }*/
             // Configure solver for memory optimization
             cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
             cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
@@ -440,7 +456,7 @@ public class OpLexVsOpRevLexVsHybrid {
                         IloIntExpr[] reversedMatrixI = arrayNew(MATRIX[i], i, j);
                         IloIntExpr[] reversedMatrixJ = arrayNew(MATRIX[j], i, j);
                         //cp.add(cp.lexicographic(reversedMatrixJ, reversedMatrixI)); // Anti_lex
-                        cp.add(cp.lexicographic(reversedMatrixJ, reversedMatrixI));
+                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
                     }
                 }
             }
@@ -608,8 +624,18 @@ public class OpLexVsOpRevLexVsHybrid {
             }
 
 
-
-
+        // 5. Connectivity Constraint (Upper Off-Diagonal Technique)
+            // Connectivity for Lex (Lower Off-Diagonal)
+            // Safe Connectivity for Lex (Minimal version)
+// Very Weak but Often Sufficient with Lex
+// Only force the first few vertices to connect backward
+            /*for (int i = 1; i < Math.min(4, N); i++) {   // limit to first 3-4 vertices
+                IloIntVar[] lower = new IloIntVar[i];
+                for (int j = 0; j < i; j++) {
+                    lower[j] = MATRIX[i][j];
+                }
+                cp.add(cp.gt(cp.sum(lower), 0));
+            }*/
             // Constraint Of connectivity using Upper Off-Diagonal Technique
             /*for (int i = 0; i < N; i++) {
                 // Ensure that the sum of the subarray from i+1 to N is greater than 0
@@ -618,7 +644,7 @@ public class OpLexVsOpRevLexVsHybrid {
                     IloIntVar[] subArray = Arrays.copyOfRange(MATRIX[i], i + 1, N);
                     cp.add(cp.gt(cp.sum(subArray), 0));
                 }
-            }*/
+            }*/ //ça marche pas
 
             // Configure solver for memory optimization
             cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
@@ -926,20 +952,44 @@ public class OpLexVsOpRevLexVsHybrid {
             }*/
 
             // Constraint: Symmetry breaking CoLex (RevLex) Same code
+
+// =============================================
+            // 4. Symmetry Breaking: DOUBLE COLEX / DOUBLE RevLex
+            // =============================================
+            // --- Colex on Rows ---
             for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
-                        // Reverse row i and row j, then apply lex
-                        IloIntVar[] revI = new IloIntVar[N];
-                        IloIntVar[] revJ = new IloIntVar[N];
+                        IloIntVar[] rowI_rev = new IloIntVar[N];
+                        IloIntVar[] rowJ_rev = new IloIntVar[N];
                         for (int k = 0; k < N; k++) {
-                            revI[k] = MATRIX[i][N - 1 - k];
-                            revJ[k] = MATRIX[j][N - 1 - k];
+                            rowI_rev[k] = MATRIX[i][N - 1 - k];
+                            rowJ_rev[k] = MATRIX[j][N - 1 - k];
                         }
-                        cp.add(cp.lexicographic(revI, revJ));
+                        cp.add(cp.lexicographic(rowI_rev, rowJ_rev));   // Colex on rows
                     }
                 }
             }
+
+
+            // --- Colex on Columns ---
+            /*
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+
+                    IloIntVar[] colI_rev = new IloIntVar[N];
+                    IloIntVar[] colJ_rev = new IloIntVar[N];
+
+                    for (int k = 0; k < N; k++) {
+                        colI_rev[k] = MATRIX[N - 1 - k][i];   // reverse column i
+                        colJ_rev[k] = MATRIX[N - 1 - k][j];   // reverse column j
+                    }
+
+                    cp.add(cp.lexicographic(colI_rev, colJ_rev));   // Colex on columns
+                }
+            }*/
+
+
 
 
 
@@ -1048,7 +1098,6 @@ public class OpLexVsOpRevLexVsHybrid {
                     }
                 }
             }
-
 
 
 
@@ -1485,8 +1534,8 @@ public class OpLexVsOpRevLexVsHybrid {
                 // Subtract the diagonal element (MATRIX[i][i])
                 IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
                 // Add the constraint
-                //cp.addEq(sumExceptDiagonal, DEGREE[i]);
-                cp.addLe(sumExceptDiagonal, DEGREE[i]);  // used for Bounded Graphs
+                cp.addEq(sumExceptDiagonal, DEGREE[i]);
+               // cp.addLe(sumExceptDiagonal, DEGREE[i]);  // used for Bounded Graphs
             }
 
 
@@ -1565,15 +1614,29 @@ public class OpLexVsOpRevLexVsHybrid {
 */
 
 
-            // Constraint Of connectivity using Upper Off-Diagonal Technique
-            for (int i = 0; i < N; i++) {
+            // Constraint Of connectivity using Upper Off-Diagonal Technique (First proposal
+            /*for (int i = 0; i < N; i++) {
                 // Ensure that the sum of the subarray from i+1 to N is greater than 0
                 if ((i + 1) < N) // pour eviter la derniere ligne
                 {
                     IloIntVar[] subArray = Arrays.copyOfRange(MATRIX[i], i + 1, N);
                     cp.add(cp.gt(cp.sum(subArray), 0));
                 }
-            }
+            }*/
+
+            // Connectivity Constraint: Every vertex i must connect to at least one higher-indexed vertex
+          /*  for (int i = 0; i < N - 1; i++) {                    // No need for i == N-1
+                IloIntVar[] upperPart = new IloIntVar[N - i - 1];
+                for (int j = 0; j < upperPart.length; j++) {
+                    upperPart[j] = MATRIX[i][i + 1 + j];
+                }
+                cp.add(cp.gt(cp.sum(upperPart), 0));
+            }*/
+            /*
+            for (int i = 0; i < N - 1; i++) {
+                IloIntVar[] upper = Arrays.copyOfRange(MATRIX[i], i + 1, N);
+                cp.add(cp.gt(cp.sum(upper), 0));
+            }*/
 
             // Configure solver for memory optimization
             cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
