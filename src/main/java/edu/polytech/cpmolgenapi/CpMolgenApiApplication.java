@@ -16,10 +16,12 @@ public class CpMolgenApiApplication {
     public static void runExperimentsHybrid() {
         printHeaderPaperLexRevLex();
         for (TestCase sample : DataExperForPaperLexVsRevLex.GraphSamples) {
-            //Result Lex = OpLexVsOpRevLexVsHybrid.testLex(sample.degrees);
-            //Result RevLex = OpLexVsOpRevLexVsHybrid.testRevLex(sample.degrees);
+            Result Lex = OpLexVsOpRevLexVsHybrid.testLex(sample.degrees);
+            Result RevLex = OpLexVsOpRevLexVsHybrid.testRevLex(sample.degrees); // or CoLex
+            Result AntiLex = OpLexVsOpRevLexVsHybrid.testAntiLex(sample.degrees);
+            Result Snake = OpLexVsOpRevLexVsHybrid.testSnake(sample.degrees);
 
-            Result optLex =  OpLexVsOpRevLexVsHybrid.testOptimizedLex(sample.degrees);
+            Result optLex =  OpLexVsOpRevLexVsHybrid.testOptimizedLex(sample.degrees); // With CanonicalChecker
             Result optRevLex = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(sample.degrees);
             //Result optLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(sample.degrees);
             //Result optRevLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(sample.degrees);;
@@ -38,7 +40,8 @@ public class CpMolgenApiApplication {
                 printResults(sample.name, Lex, RevLex, optLex, optRevLex,
                     isoLex, isoRevLex, isoOptLex, isoOptRevLex);
 */
-            printResults(sample.name, optLex, optRevLex, optLexCon, optRevLexCon, optRevLexConDiagRev);
+            //printResults(sample.name, optLex, optRevLex, optLexCon, optRevLexCon, optRevLexConDiagRev);
+            printResults(sample.name, Lex, RevLex, AntiLex, Snake, optRevLexConDiagRev);
         }
         System.out.printf("\n ********* End of Experimentation  **************   \n");
     }

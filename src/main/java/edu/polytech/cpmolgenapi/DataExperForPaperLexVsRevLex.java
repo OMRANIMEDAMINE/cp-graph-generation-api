@@ -9,7 +9,9 @@ public class DataExperForPaperLexVsRevLex {
             new TestCase("BD2_12", new int[]{2,2,2,2,2,2,2,2,2,2,2,2}, "Bounded-degree ≤2 graph on 12 vertices"),
             new TestCase("BD2_14", new int[]{2,2,2,2,2,2,2,2,2,2,2,2,2,2}, "Bounded-degree ≤2 graph on 14 vertices"),
 
-            */new TestCase("BD3_6",  new int[]{3,3,3,3,3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 8 vertices"),
+            */
+          //  new TestCase("BD3_6",  new int[]{3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 8 vertices"),
+            new TestCase("BD3_6",  new int[]{3,3,3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 8 vertices"),
             //****new TestCase("BD3_14",  new int[]{3,3,3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 8 vertices"),
             //new TestCase("BD3_10", new int[]{3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 10 vertices"),
             //*new TestCase("BD3_12", new int[]{3,3,3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 12 vertices"),

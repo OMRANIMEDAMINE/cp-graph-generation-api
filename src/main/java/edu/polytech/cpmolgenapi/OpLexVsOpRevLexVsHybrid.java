@@ -14,6 +14,300 @@ import java.util.*;
 
 public class OpLexVsOpRevLexVsHybrid {
 
+
+
+    public static Result testSnake(int[] DEGREE) {
+        try {
+            int N = DEGREE.length; // Example size of adjacency matrix
+            IloCP cp = new IloCP();
+
+            // Define Vars of the Adjacency matrix
+            IloIntVar[][] MATRIX = new IloIntVar[N][];
+            for (int i = 0; i < N; i++) {
+                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            }
+
+            // Constraint 1: Null Diagonal of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                cp.add(cp.eq(MATRIX[i][i], 1));
+            }
+
+            // Constraint 2: Define Degree Constraint
+            for (int i = 0; i < N; i++) {
+                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i]+1);
+            }
+
+
+            // Constraint 3: Symmetry of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
+                }
+            }
+
+
+            // Constraint 3: Symmetry breaking SNAKE
+
+
+            // Full Max-Lex: for every same-degree row swap (i,j),
+            // the current matrix must be >= the swapped version
+           /* for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+
+                        // Build flattened current sequence: rows 0..N-1 as-is
+                        // Build flattened swapped sequence: rows i and j exchanged
+                        // Current must be >=_lex swapped
+
+                        // Rows before i: identical in both → skip
+                        // First difference occurs at row i:
+                        //   current[row i]  vs  swapped[row j]
+                        //   current[row j]  vs  swapped[row i]
+
+                        // Enforce: [row_i, row_j] >=_lex [row_j, row_i]
+                        // i.e., concatenation of (row_i, row_j) >=_lex (row_j, row_i)
+
+                        IloIntVar[] current = new IloIntVar[2 * N];
+                        IloIntVar[] swapped = new IloIntVar[2 * N];
+
+                        for (int k = 0; k < N; k++) {
+                            current[k]     = MATRIX[i][k];  // row i
+                            current[N + k] = MATRIX[j][k];  // row j
+                            swapped[k]     = MATRIX[j][k];  // row j (swapped to position i)
+                            swapped[N + k] = MATRIX[i][k];  // row i (swapped to position j)
+                        }
+
+                        // current >=_lex swapped  ↔  swapped <=_lex current
+                        cp.add(cp.lexicographic(swapped, current));
+                    }
+                }
+            }*/
+            // Constraint: Snake ordering (corrected for regular graphs)
+            /*for (int i = 0; i < N - 1; i++) {
+                int j = i + 1;
+                if (DEGREE[i] == DEGREE[j]) {
+
+                    // Compute Hamming distance between row i and row i+1
+                    IloIntVar[] diff = new IloIntVar[N];
+                    for (int k = 0; k < N; k++) {
+                        IloIntVar d = cp.intVar(0, 1);
+                        cp.add(cp.eq(d, cp.abs(cp.diff(MATRIX[i][k], MATRIX[j][k]))));
+                        diff[k] = d;
+                    }
+
+                    // Hamming = 2 (one bit added, one bit removed → degree preserved)
+                    cp.add(cp.le(cp.sum(diff), 2));
+                }
+            }*/
+
+
+// row[j] <=_lex row[i]  for all same-degree pairs (i < j)
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+                        cp.add(cp.lexicographic(MATRIX[j], MATRIX[i]));
+                    }
+                }
+            }
+
+
+            // Extract columns and enforce col[c2] <=_lex col[c1]
+            for (int c1 = 0; c1 < N - 1; c1++) {
+                for (int c2 = c1 + 1; c2 < N; c2++) {
+                    if (DEGREE[c1] == DEGREE[c2]) {
+                        IloIntVar[] col1 = new IloIntVar[N];
+                        IloIntVar[] col2 = new IloIntVar[N];
+                        for (int k = 0; k < N; k++) {
+                            col1[k] = MATRIX[k][c1];
+                            col2[k] = MATRIX[k][c2];
+                        }
+                        // col[c1] >=_lex col[c2]
+                        cp.add(cp.lexicographic(col2, col1));
+                    }
+                }
+            }
+
+            // For every same-degree row swap (i,j):
+// concatenation [row_i | row_j] >=_lex [row_j | row_i]
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+
+                        IloIntVar[] current = new IloIntVar[2 * N];
+                        IloIntVar[] swapped = new IloIntVar[2 * N];
+
+                        for (int k = 0; k < N; k++) {
+                            current[k]     = MATRIX[i][k];  // row i
+                            current[N + k] = MATRIX[j][k];  // row j
+                            swapped[k]     = MATRIX[j][k];  // row j swapped to position i
+                            swapped[N + k] = MATRIX[i][k];  // row i swapped to position j
+                        }
+
+                        // [row_i | row_j] >=_lex [row_j | row_i]
+                        // ↔ swapped <=_lex current
+                        cp.add(cp.lexicographic(swapped, current));
+                    }
+                }
+            }
+
+            // Configure solver for memory optimization
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
+            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
+
+            // Measure execution time
+            long startTime = System.currentTimeMillis();
+
+
+            // Create timestamp for filename
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
+            String timestamp = sdf.format(new Date());
+            String filename = "output_testLex.txt";
+            PrintWriter writer = new PrintWriter(new FileWriter(filename));
+
+            // Start the search
+            cp.startNewSearch();
+            int solutionCount = 0;
+            boolean ok = false;
+           /* while (cp.next()) {
+                solutionCount++;
+                ok = true;
+                //System.out.print(" \n");
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
+                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
+                    }
+                    //System.out.print(" \n");
+                    writer.println();
+                }
+                writer.println();
+                writer.println();
+            }*/
+            while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }
+            writer.close();
+            cp.endSearch(); // End the search
+
+// Measure and print execution time
+            long endTime = System.currentTimeMillis();
+            long elapsedTime = endTime - startTime;
+
+            return new Result(solutionCount, elapsedTime);
+        } catch (IloException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    public static Result testAntiLex(int[] DEGREE) {
+        try {
+            int N = DEGREE.length; // Example size of adjacency matrix
+            IloCP cp = new IloCP();
+
+            // Define Vars of the Adjacency matrix
+            IloIntVar[][] MATRIX = new IloIntVar[N][];
+            for (int i = 0; i < N; i++) {
+                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            }
+
+            // Constraint 1: Null Diagonal of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                cp.add(cp.eq(MATRIX[i][i], 1));
+            }
+
+            /*// Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
+            for (int i = 0; i < N; i++) {
+                // Sum of the entire row
+                IloIntExpr rowSum = cp.sum(MATRIX[i]);
+                // Subtract the diagonal element (MATRIX[i][i])
+                IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
+                // Add the constraint
+                cp.addEq(sumExceptDiagonal, DEGREE[i]);
+            }*/
+            // Adjust degree constraint: subtract 1 for the diagonal
+            for (int i = 0; i < N; i++) {
+                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i] + 1); // +1 accounts for diagonal
+            }
+
+// Adjust degree constraint: subtract 1 for the diagonal
+            for (int i = 0; i < N; i++) {
+                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i] + 1); // +1 accounts for diagonal
+            }
+
+            // Constraint 3: Symmetry of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
+                }
+            }
+
+
+            // Constraint: Symmetry breaking AntiLex
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+                        // row[j] ≤_lex row[i]  (reversed ordering)
+                        cp.add(cp.lexicographic(MATRIX[j], MATRIX[i]));
+                    }
+                }
+            }
+
+            // Configure solver for memory optimization
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
+            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
+
+            // Measure execution time
+            long startTime = System.currentTimeMillis();
+
+
+            // Create timestamp for filename
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
+            String timestamp = sdf.format(new Date());
+            String filename = "output_testLex.txt";
+            PrintWriter writer = new PrintWriter(new FileWriter(filename));
+
+            // Start the search
+            cp.startNewSearch();
+            int solutionCount = 0;
+            boolean ok = false;
+           /* while (cp.next()) {
+                solutionCount++;
+                ok = true;
+                //System.out.print(" \n");
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
+                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
+                    }
+                    //System.out.print(" \n");
+                    writer.println();
+                }
+                writer.println();
+                writer.println();
+            }*/
+            while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }
+            writer.close();
+            cp.endSearch(); // End the search
+
+// Measure and print execution time
+            long endTime = System.currentTimeMillis();
+            long elapsedTime = endTime - startTime;
+
+            return new Result(solutionCount, elapsedTime);
+        } catch (IloException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static Result testLex(int[] DEGREE) {
         try {
             int N = DEGREE.length; // Example size of adjacency matrix
@@ -106,6 +400,7 @@ public class OpLexVsOpRevLexVsHybrid {
         }
     }
 
+
     public static Result testOptimizedLex(int[] DEGREE) {
         try {
             int N = DEGREE.length; // Example size of adjacency matrix
@@ -121,7 +416,6 @@ public class OpLexVsOpRevLexVsHybrid {
             for (int i = 0; i < N; i++) {
                 cp.add(cp.eq(MATRIX[i][i], 0));
             }
-
 
             // Constraint 2: Define Degree Constraint
             for (int i = 0; i < N; i++) {
@@ -188,8 +482,7 @@ public class OpLexVsOpRevLexVsHybrid {
                 writer.println();
                 writer.println();
             }*/
-            while (cp.next()) {
-
+            /*while (cp.next()) {
                 // 🔥 Your "callback"
                 int[][] currentMatrix = new int[N][N];
 
@@ -205,6 +498,9 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
                 solutionCount++; // Count solutions without storing them
 
+            }*/
+             while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
             }
             writer.close();
             cp.endSearch(); // End the search
@@ -594,7 +890,7 @@ public class OpLexVsOpRevLexVsHybrid {
                 cp.add(cp.eq(MATRIX[i][i], 1));
             }
 
-            // Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
+            /*// Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
             for (int i = 0; i < N; i++) {
                 // Sum of the entire row
                 IloIntExpr rowSum = cp.sum(MATRIX[i]);
@@ -602,6 +898,10 @@ public class OpLexVsOpRevLexVsHybrid {
                 IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
                 // Add the constraint
                 cp.addEq(sumExceptDiagonal, DEGREE[i]);
+            }*/
+            // Adjust degree constraint: subtract 1 for the diagonal
+            for (int i = 0; i < N; i++) {
+                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i] + 1); // +1 accounts for diagonal
             }
 
 
@@ -615,12 +915,28 @@ public class OpLexVsOpRevLexVsHybrid {
 
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            /*for (int i = 0; i < N-1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntExpr[] reversedMatrixI = reverseArray(MATRIX[i]);
                         IloIntExpr[] reversedMatrixJ = reverseArray(MATRIX[j]);
                         cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
+                    }
+                }
+            }*/
+
+            // Constraint: Symmetry breaking CoLex (RevLex) Same code
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+                        // Reverse row i and row j, then apply lex
+                        IloIntVar[] revI = new IloIntVar[N];
+                        IloIntVar[] revJ = new IloIntVar[N];
+                        for (int k = 0; k < N; k++) {
+                            revI[k] = MATRIX[i][N - 1 - k];
+                            revJ[k] = MATRIX[j][N - 1 - k];
+                        }
+                        cp.add(cp.lexicographic(revI, revJ));
                     }
                 }
             }
@@ -647,7 +963,7 @@ public class OpLexVsOpRevLexVsHybrid {
             cp.startNewSearch();
             int solutionCount = 0;
             boolean ok = false;
-            while (cp.next()) {
+            /*while (cp.next()) {
                 solutionCount++;
                 ok = true;
                 //System.out.print(" \n");
@@ -661,10 +977,10 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
                 writer.println();
                 writer.println();
-            }
-               /*while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
             }*/
+               while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }
             writer.close();
             cp.endSearch(); // End the search
 
