@@ -573,7 +573,7 @@ public class OpLexVsOpRevLexVsHybrid {
             }
 
             // Constraint Of connectivity using Upper Off-Diagonal Technique
-
+/*
             // Generation of K_i Variables
             // Define the distance variables
             IloIntVar[] z = new IloIntVar[N];
@@ -622,29 +622,18 @@ public class OpLexVsOpRevLexVsHybrid {
                     //si aij >0 alors abs( zi - zj) <= 1
                 }
             }
+*/
 
-
-        // 5. Connectivity Constraint (Upper Off-Diagonal Technique)
-            // Connectivity for Lex (Lower Off-Diagonal)
-            // Safe Connectivity for Lex (Minimal version)
-// Very Weak but Often Sufficient with Lex
-// Only force the first few vertices to connect backward
-            /*for (int i = 1; i < Math.min(4, N); i++) {   // limit to first 3-4 vertices
+            // 5. Adapted Upper Off-Diagonal Connectivity for Lex
+            // 5. Correct Lower Off-Diagonal Connectivity for Lex
+            for (int i = 2; i < N; i++) {                  // start from i=2
                 IloIntVar[] lower = new IloIntVar[i];
                 for (int j = 0; j < i; j++) {
                     lower[j] = MATRIX[i][j];
                 }
                 cp.add(cp.gt(cp.sum(lower), 0));
-            }*/
-            // Constraint Of connectivity using Upper Off-Diagonal Technique
-            /*for (int i = 0; i < N; i++) {
-                // Ensure that the sum of the subarray from i+1 to N is greater than 0
-                if ((i + 1) < N) // pour eviter la derniere ligne
-                {
-                    IloIntVar[] subArray = Arrays.copyOfRange(MATRIX[i], i + 1, N);
-                    cp.add(cp.gt(cp.sum(subArray), 0));
-                }
-            }*/ //ça marche pas
+            }
+
 
             // Configure solver for memory optimization
             cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
@@ -1615,14 +1604,14 @@ public class OpLexVsOpRevLexVsHybrid {
 
 
             // Constraint Of connectivity using Upper Off-Diagonal Technique (First proposal
-            /*for (int i = 0; i < N; i++) {
+            for (int i = 0; i < N; i++) {
                 // Ensure that the sum of the subarray from i+1 to N is greater than 0
                 if ((i + 1) < N) // pour eviter la derniere ligne
                 {
                     IloIntVar[] subArray = Arrays.copyOfRange(MATRIX[i], i + 1, N);
                     cp.add(cp.gt(cp.sum(subArray), 0));
                 }
-            }*/
+            }
 
             // Connectivity Constraint: Every vertex i must connect to at least one higher-indexed vertex
           /*  for (int i = 0; i < N - 1; i++) {                    // No need for i == N-1
