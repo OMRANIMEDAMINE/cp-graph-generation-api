@@ -1,4 +1,5 @@
 package edu.polytech.cpmolgenapi;
+import ilog.concert.IloException;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.jgrapht.Graph;
@@ -8,8 +9,9 @@ import java.util.List;
 @SpringBootApplication
 public class CpMolgenApiApplication {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         SpringApplication.run(CpMolgenApiApplication.class, args);
+
         runExperimentsHybrid();
     }
 
@@ -17,7 +19,7 @@ public class CpMolgenApiApplication {
         printHeaderPaperLexRevLex();
         for (TestCase sample : DataExperForPaperLexVsRevLex.GraphSamples) {
             Result Lex = OpLexVsOpRevLexVsHybrid.testLex(sample.degrees);
-            Result RevLex = OpLexVsOpRevLexVsHybrid.testRevLex(sample.degrees); // or CoLex
+             Result RevLex = OpLexVsOpRevLexVsHybrid.testRevLex(sample.degrees); // or CoLex
             Result AntiLex = OpLexVsOpRevLexVsHybrid.testAntiLex(sample.degrees);
             Result Snake = OpLexVsOpRevLexVsHybrid.testSnake(sample.degrees);
 
@@ -39,7 +41,7 @@ public class CpMolgenApiApplication {
                 printResults(sample.name, Lex, RevLex, optLex, optRevLex,
                     isoLex, isoRevLex, isoOptLex, isoOptRevLex);
 */
-            printResults(sample.name, optLex, optRevLex, optLexCon, optRevLexCon, optRevLexConDiagRev);
+            printResults(sample.name, Lex, RevLex, optLexCon, optRevLexCon, optRevLexConDiagRev);
 
         }
         System.out.printf("\n ********* End of Experimentation  **************   \n");

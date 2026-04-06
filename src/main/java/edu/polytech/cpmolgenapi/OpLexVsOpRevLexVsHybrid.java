@@ -348,6 +348,29 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
             }
 
+            /*for (int i = 0; i < N - 1; i++) { // double implication for Lex // VALID IN TEST BUT OptLex is better
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+
+                        IloConstraint prefix = null;
+
+                        for (int k = 0; k < N; k++) {
+
+                            IloConstraint le = cp.le(MATRIX[i][k], MATRIX[j][k]);
+
+                            if (k == 0) {
+                                cp.add(le);
+                            } else {
+                                IloConstraint eq = cp.eq(MATRIX[i][k-1], MATRIX[j][k-1]);
+                                cp.add(cp.imply(eq, le));
+                            }
+                        }
+                    }
+                }
+            }*/
+
+
+
 
 
            /*
@@ -364,10 +387,18 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
             }*/
             // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+            /*cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
             cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
             cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display*/
+            cp.setParameter(IloCP.IntParam.Workers, 1);
+           // cp.setParameter(IloCP.IntParam.RandomSeed, seed);
+
+// DO NOT force search type
+// cp.setParameter(IloCP.IntParam.SearchType, ...); ❌
+
+            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Medium);
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet);
 
             // Measure execution time
             long startTime = System.currentTimeMillis();
@@ -407,7 +438,8 @@ public class OpLexVsOpRevLexVsHybrid {
 // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
-
+            System.out.println( "NumberOfFails: " + cp.getInfo(IloCP.IntInfo.NumberOfFails));
+            System.out.println(  "NumberOfBranches: " +  cp.getInfo(IloCP.IntInfo.NumberOfBranches));
             return new Result(solutionCount, elapsedTime);
         } catch (IloException e) {
             throw new RuntimeException(e);
@@ -415,6 +447,7 @@ public class OpLexVsOpRevLexVsHybrid {
             throw new RuntimeException(e);
         }
     }
+
 
 
     public static Result testOptimizedLex(int[] DEGREE) {
@@ -573,7 +606,7 @@ public class OpLexVsOpRevLexVsHybrid {
             }
 
             // Constraint Of connectivity using Upper Off-Diagonal Technique
-/*
+
             // Generation of K_i Variables
             // Define the distance variables
             IloIntVar[] z = new IloIntVar[N];
@@ -622,19 +655,19 @@ public class OpLexVsOpRevLexVsHybrid {
                     //si aij >0 alors abs( zi - zj) <= 1
                 }
             }
-*/
+
 
             // 5. Adapted Upper Off-Diagonal Connectivity for Lex
-            // 5. Correct Lower Off-Diagonal Connectivity for Lex
-            for (int i = 2; i < N; i++) {                  // start from i=2
-                IloIntVar[] lower = new IloIntVar[i];
+/*
+            // Best practical connectivity attempt for Optimized Lex - OFF DIAG IDEA NOT WORKS WITH LEX
+            // (Lower off-diagonal focused on later rows)
+            for (int i = 2; i < N; i++) {           // Start from row 2 — best compromise
+                IloIntVar[] lowerPart = new IloIntVar[i];
                 for (int j = 0; j < i; j++) {
-                    lower[j] = MATRIX[i][j];
+                    lowerPart[j] = MATRIX[i][j];     // Must connect to at least one previous vertex
                 }
-                cp.add(cp.gt(cp.sum(lower), 0));
-            }
-
-
+                cp.add(cp.gt(cp.sum(lowerPart), 0));
+            }*/
             // Configure solver for memory optimization
             cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
             cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
@@ -930,7 +963,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            /*for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N-1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntExpr[] reversedMatrixI = reverseArray(MATRIX[i]);
@@ -938,7 +971,8 @@ public class OpLexVsOpRevLexVsHybrid {
                         cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
                     }
                 }
-            }*/
+            }
+
 
             // Constraint: Symmetry breaking CoLex (RevLex) Same code
 
@@ -946,7 +980,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // 4. Symmetry Breaking: DOUBLE COLEX / DOUBLE RevLex
             // =============================================
             // --- Colex on Rows ---
-            for (int i = 0; i < N - 1; i++) {
+           /* for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntVar[] rowI_rev = new IloIntVar[N];
@@ -958,7 +992,7 @@ public class OpLexVsOpRevLexVsHybrid {
                         cp.add(cp.lexicographic(rowI_rev, rowJ_rev));   // Colex on rows
                     }
                 }
-            }
+            }*/
 
 
             // --- Colex on Columns ---
@@ -984,10 +1018,20 @@ public class OpLexVsOpRevLexVsHybrid {
 
 
             // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+      /*cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
             cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
             cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display*/
+
+
+            cp.setParameter(IloCP.IntParam.Workers, 1);
+            // cp.setParameter(IloCP.IntParam.RandomSeed, seed);
+
+            // DO NOT force search type
+            // cp.setParameter(IloCP.IntParam.SearchType, ...); ❌
+
+            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Medium);
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet);
 
             // Measure execution time
             long startTime = System.currentTimeMillis();
@@ -1026,6 +1070,8 @@ public class OpLexVsOpRevLexVsHybrid {
 // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
+            System.out.println( "NumberOfFails: " + cp.getInfo(IloCP.IntInfo.NumberOfFails));
+            System.out.println(  "NumberOfBranches: " +  cp.getInfo(IloCP.IntInfo.NumberOfBranches));
 
             return new Result(solutionCount, elapsedTime);
 
@@ -1087,8 +1133,6 @@ public class OpLexVsOpRevLexVsHybrid {
                     }
                 }
             }
-
-
 
             // Configure solver for memory optimization
             cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
