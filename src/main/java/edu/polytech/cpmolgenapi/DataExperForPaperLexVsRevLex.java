@@ -12,6 +12,7 @@ public class DataExperForPaperLexVsRevLex {
             */
           //  new TestCase("BD3_6",  new int[]{3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 8 vertices"),
             new TestCase("BD3_6",  new int[]{3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 8 vertices"),
+         //   new TestCase("BD5_8", new int[]{5,5,5,5,5,5,5,5,5,5}, "Bounded-degree ≤5 graph on 10 vertices"),
             //****new TestCase("BD3_14",  new int[]{3,3,3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 8 vertices"),
             //new TestCase("BD3_10", new int[]{3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 10 vertices"),
             //*new TestCase("BD3_12", new int[]{3,3,3,3,3,3,3,3,3,3,3,3}, "Bounded-degree ≤3 graph on 12 vertices"),
@@ -23,7 +24,6 @@ public class DataExperForPaperLexVsRevLex {
            // new TestCase("BD4_12", new int[]{4,4,4,4,4,4,4,4,4,4,4,4}, "Bounded-degree ≤4 graph on 12 vertices"),
             //new TestCase("BD4_14", new int[]{4,4,4,4,4,4,4,4,4,4,4,4,4,4}, "Bounded-degree ≤4 graph on 14 vertices"),
 
-          //  new TestCase("BD5_8", new int[]{5,5,5,5,5,5,5,5}, "Bounded-degree ≤5 graph on 10 vertices"),
             //**new TestCase("BD5_10", new int[]{5,5,5,5,5,5,5,5,5,5}, "Bounded-degree ≤5 graph on 10 vertices"),
 
 

@@ -808,7 +808,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Create timestamp for filename
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
             String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedLex.txt";
+            String filename = "output_testOptimizedLexCon.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
             // Start the search
@@ -1011,7 +1011,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Create timestamp for filename
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
             String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedLex.txt";
+            String filename = "output_testOptimizedLexKKtree.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
             // Start the search
