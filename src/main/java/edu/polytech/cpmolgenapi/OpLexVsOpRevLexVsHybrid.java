@@ -575,6 +575,121 @@ public class OpLexVsOpRevLexVsHybrid {
             throw new RuntimeException(e);
         }
     }
+    public static Result testOptimizedLexWithCanocialChecker(int[] DEGREE) {
+        try {
+            int N = DEGREE.length; // Example size of adjacency matrix
+            IloCP cp = new IloCP();
+
+            // Define Vars of the Adjacency matrix
+            IloIntVar[][] MATRIX = new IloIntVar[N][];
+            for (int i = 0; i < N; i++) {
+                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            }
+
+            // Constraint 1: Null Diagonal of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                cp.add(cp.eq(MATRIX[i][i], 0));
+            }
+
+            // Constraint 2: Define Degree Constraint
+            for (int i = 0; i < N; i++) {
+                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i]);
+                // cp.addLe(cp.sum(MATRIX[i]), DEGREE[i]); // Used for Bounded Graphs
+            }
+
+            // Constraint 3: Symmetry of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
+                }
+            }
+
+
+            // Constraint 3: Symmetry breaking Opt Lex
+            /* OK WORKS FINE*/
+
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    if ((DEGREE[i] == DEGREE[j])) {
+                        IloIntExpr[] reversedMatrixI = arrayNew(MATRIX[i], i, j);
+                        IloIntExpr[] reversedMatrixJ = arrayNew(MATRIX[j], i, j);
+                        //cp.add(cp.lexicographic(reversedMatrixJ, reversedMatrixI)); // Anti_lex
+                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
+                    }
+                }
+            }
+
+
+
+            // Configure solver for memory optimization
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
+            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
+
+            // Measure execution time
+            long startTime = System.currentTimeMillis();
+
+            // Create timestamp for filename
+            String filename = "output_testOptimizedLexWithCC.txt";
+            PrintWriter writer = new PrintWriter(new FileWriter(filename));
+
+            // Start the search
+            cp.startNewSearch();
+            int solutionCount = 0;
+            while (cp.next()) {
+                // 🔥 Your "callback"
+                int[][] currentMatrix = new int[N][N];
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        currentMatrix[i][j] = (int) cp.getValue(MATRIX[i][j]);
+                    }
+                }
+                // 🔥 Canonical filtering
+                if (!CanonicalChecker.verifyCanonical(currentMatrix)) {
+                    continue;
+                }
+                solutionCount++;
+                //System.out.print(" \n");
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        //System.out.print(" " + (currentMatrix[i][j]);
+                        writer.print(" " +    currentMatrix[i][j]);
+                    }
+                    //System.out.print(" \n");
+                    writer.println();
+                }
+                writer.println();
+                writer.println();
+            }
+           /* while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }*/
+            writer.close();
+            cp.endSearch(); // End the search
+
+            // Measure and print execution time
+            long endTime = System.currentTimeMillis();
+            long elapsedTime = endTime - startTime;
+
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
+
+
+        } catch (IloException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
 
     public static Result testOptimizedLexCon(int[] DEGREE) {
         try {
@@ -1090,6 +1205,123 @@ public class OpLexVsOpRevLexVsHybrid {
     }
 
 
+    public static Result testOptimizedRevLexWithCanocialChecker(int[] DEGREE) {
+        try {
+            int N = DEGREE.length; // Example size of adjacency matrix
+
+            // Define Vars of the Adjacency matrix
+            IloCP cp = new IloCP();
+
+            // Define Vars of the Adjacency matrix
+            IloIntVar[][] MATRIX = new IloIntVar[N][];
+            for (int i = 0; i < N; i++) {
+                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            }
+
+            // Constraint 1: Null Diagonal of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                cp.add(cp.eq(MATRIX[i][i], 1));
+            }
+
+            // Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
+            for (int i = 0; i < N; i++) {
+                // Sum of the entire row
+                IloIntExpr rowSum = cp.sum(MATRIX[i]);
+                // Subtract the diagonal element (MATRIX[i][i])
+                IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
+                // Add the constraint
+                cp.addEq(sumExceptDiagonal, DEGREE[i]);
+                //cp.addLe(sumExceptDiagonal, DEGREE[i]);  // used for Bounded Graphs
+            }
+
+
+            // Constraint 3: Symmetry of the Adjacency matrix
+            for (int i = 0; i < N; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
+                }
+            }
+
+
+            //   Constraint 3: Symmetry breaking RevLex
+            /* OK WORKS FINE*/
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+                        IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
+                        IloIntExpr[] reversedMatrixJ = reverseArrayNew(MATRIX[j], i, j);
+                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
+                    }
+                }
+            }
+
+            // Configure solver for memory optimization
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
+            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
+
+            // Measure execution time
+            long startTime = System.currentTimeMillis();
+
+            // Create timestamp for filename
+            String filename = "output_testOptimizedRevLexWithCC.txt";
+            PrintWriter writer = new PrintWriter(new FileWriter(filename));
+
+            // Start the search
+            cp.startNewSearch();
+            int solutionCount = 0;
+            while (cp.next()) {
+                // 🔥 Your "callback"
+                int[][] currentMatrix = new int[N][N];
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        currentMatrix[i][j] = (int) cp.getValue(MATRIX[i][j]);
+                    }
+                }
+                // 🔥 Canonical filtering
+                if (!CanonicalChecker.verifyCanonical(currentMatrix)) {
+                    continue;
+                }
+                solutionCount++;
+                //System.out.print(" \n");
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        //System.out.print(" " + (currentMatrix[i][j]);
+                        writer.print(" " +    currentMatrix[i][j]);
+                    }
+                    //System.out.print(" \n");
+                    writer.println();
+                }
+                writer.println();
+                writer.println();
+            }
+           /* while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }*/
+            writer.close();
+            cp.endSearch(); // End the search
+
+            // Measure and print execution time
+            long endTime = System.currentTimeMillis();
+            long elapsedTime = endTime - startTime;
+
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
+
+
+        } catch (IloException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
     public static Result testOptimizedRevLex(int[] DEGREE) {
         try {
             int N = DEGREE.length; // Example size of adjacency matrix

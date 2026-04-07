@@ -1,4 +1,5 @@
 package edu.polytech.cpmolgenapi;
+
 import ilog.concert.IloException;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -18,29 +19,25 @@ public class CpMolgenApiApplication {
         SpringApplication.run(CpMolgenApiApplication.class, args);
         runExperimentsHybrid();
     }
+
     public static void resetFile(String filename) throws IOException {
         new PrintWriter(new FileWriter(filename, false)).close();
     }
+
     public static void runExperimentsHybrid() throws IOException {
 
         for (TestCase sample : DataExperForPaperLexVsRevLex.GraphSamples) {
-            // Create timestamp for filename
-            resetFile("output_testLex.txt");
-            resetFile("output_testRevLex.txt");
-            resetFile("output_testOptimizedLex.txt");
-            resetFile("output_testOptimizedRevLex.txt");
-
-
             Result Lex = OpLexVsOpRevLexVsHybrid.testLex(sample.degrees);
             Result RevLex = OpLexVsOpRevLexVsHybrid.testRevLex(sample.degrees); // or CoLex
             Result AntiLex = OpLexVsOpRevLexVsHybrid.testAntiLex(sample.degrees);
             Result Snake = OpLexVsOpRevLexVsHybrid.testSnake(sample.degrees);
-
-            Result optLex =  OpLexVsOpRevLexVsHybrid.testOptimizedLex(sample.degrees); // With CanonicalChecker
+            Result optLex = OpLexVsOpRevLexVsHybrid.testOptimizedLex(sample.degrees);
             Result optRevLex = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(sample.degrees);
+            Result optLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedLexWithCanocialChecker(sample.degrees);
+            Result optRevLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexWithCanocialChecker(sample.degrees);
             Result optLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(sample.degrees);
-            Result optRevLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(sample.degrees);;
-            Result optRevLexConDiagRev =  OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(sample.degrees);
+            Result optRevLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(sample.degrees);
+            Result optRevLexConDiagRev = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(sample.degrees);
 
 
             //Result optLexCon =   OpLexVsOpRevLexVsHybrid.testOptimizedLexConKKtree(sample.degrees);
@@ -48,30 +45,33 @@ public class CpMolgenApiApplication {
             //Result optRevLexCon =    OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConKKtree(sample.degrees);;
 
             // Analyze isomorphism rates for each output file
-            // Analyze isomorphism rates for each output file
             IsomorphismData isoLex = analyzeIsomorphism("output_testLex.txt");
             IsomorphismData isoRevLex = analyzeIsomorphism("output_testRevLex.txt");
             IsomorphismData isoOptLex = analyzeIsomorphism("output_testOptimizedLex.txt");
             IsomorphismData isoOptRevLex = analyzeIsomorphism("output_testOptimizedRevLex.txt");
+            IsomorphismData isoOptLexWithCC = analyzeIsomorphism("output_testOptimizedLexWithCC.txt");
+            IsomorphismData isoOptRevLexWithCC = analyzeIsomorphism("output_testOptimizedRevLexWithCC.txt");
 
-            System.out.printf("LEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n",
-                    isoLex.isoRate, isoLex.totalCount, isoLex.uniqueCount);
-            System.out.printf("REVLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n",
-                    isoRevLex.isoRate, isoRevLex.totalCount, isoRevLex.uniqueCount);
-            System.out.printf("OPTLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n",
-                    isoOptLex.isoRate, isoOptLex.totalCount, isoOptLex.uniqueCount);
-            System.out.printf("OPTREVLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n",
-                    isoOptRevLex.isoRate, isoOptRevLex.totalCount, isoOptRevLex.uniqueCount);
+            System.out.printf("LEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoLex.isoRate, isoLex.totalCount, isoLex.uniqueCount);
+            System.out.printf("REVLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoRevLex.isoRate, isoRevLex.totalCount, isoRevLex.uniqueCount);
+            System.out.printf("OPTLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptLex.isoRate, isoOptLex.totalCount, isoOptLex.uniqueCount);
+            System.out.printf("OPTREVLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptRevLex.isoRate, isoOptRevLex.totalCount, isoOptRevLex.uniqueCount);
+            System.out.printf("OPTLEXWithCC: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptLexWithCC.isoRate, isoOptLexWithCC.totalCount, isoOptLexWithCC.uniqueCount);
+            System.out.printf("OPTREVLEXWWithCC: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptRevLexWithCC.isoRate, isoOptRevLexWithCC.totalCount, isoOptRevLexWithCC.uniqueCount);
 
             // Print each result individually
             System.out.println("\n=== Sample: " + sample.name + " ===\n");
 
             printSingleResult("Lex", Lex);
             printSingleResult("RevLex", RevLex);
-            printSingleResult("AntiLex", AntiLex);
-            printSingleResult("Snake", Snake);
+            //printSingleResult("AntiLex", AntiLex);
+           // printSingleResult("Snake", Snake);
             printSingleResult("OptLex", optLex);
             printSingleResult("OptRevLex", optRevLex);
+            printSingleResult("optLexWithCanocialChecker", optLexWithCC);
+            printSingleResult("optRevLexWithCanocialChecker", optRevLexWithCC);
+
+
             printSingleResult("OptLexCon", optLexCon);
             printSingleResult("OptRevLexCon", optRevLexCon);
             printSingleResult("OptRevLexConDiag", optRevLexConDiagRev);
@@ -88,7 +88,7 @@ public class CpMolgenApiApplication {
                     GraphIsomorphismAnalyzer.readGraphsFromFile(filename);
             GraphIsomorphismAnalyzer.IsomorphismResult result =
                     GraphIsomorphismAnalyzer.computeIsomorphismRate(graphs);
-            return new IsomorphismData(result.uniqueCount, result.total, 1-(result.isoRate));
+            return new IsomorphismData(result.uniqueCount, result.total, 1 - (result.isoRate));
         } catch (Exception e) {
             System.err.println("Error analyzing " + filename + ": " + e.getMessage());
             return new IsomorphismData(0, 0, 0.0);
@@ -107,7 +107,6 @@ public class CpMolgenApiApplication {
             this.isoRate = isoRate;
         }
     }
-
 
 
     private static void printSingleResult(String resultName, Result result) {
@@ -143,7 +142,9 @@ public class CpMolgenApiApplication {
         return Math.round(value * 100.0) / 100.0;
     }
 
-    /** Right-aligns a long metric value; shows "-" if not collected (value == -1). */
+    /**
+     * Right-aligns a long metric value; shows "-" if not collected (value == -1).
+     */
     private static String fmt(long v) {
         return v == -1 ? String.format("%20s", "-") : String.format("%,20d", v);
     }
