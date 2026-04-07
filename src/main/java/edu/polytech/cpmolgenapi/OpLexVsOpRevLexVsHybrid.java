@@ -11,9 +11,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.io.File;
+import java.io.IOException;
 
 public class OpLexVsOpRevLexVsHybrid {
-
 
 
     public static Result testSnake(int[] DEGREE) {
@@ -34,7 +35,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             // Constraint 2: Define Degree Constraint
             for (int i = 0; i < N; i++) {
-                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i]+1);
+                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i] + 1);
             }
 
 
@@ -137,9 +138,9 @@ public class OpLexVsOpRevLexVsHybrid {
                         IloIntVar[] swapped = new IloIntVar[2 * N];
 
                         for (int k = 0; k < N; k++) {
-                            current[k]     = MATRIX[i][k];  // row i
+                            current[k] = MATRIX[i][k];  // row i
                             current[N + k] = MATRIX[j][k];  // row j
-                            swapped[k]     = MATRIX[j][k];  // row j swapped to position i
+                            swapped[k] = MATRIX[j][k];  // row j swapped to position i
                             swapped[N + k] = MATRIX[i][k];  // row i swapped to position j
                         }
 
@@ -163,7 +164,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Create timestamp for filename
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
             String timestamp = sdf.format(new Date());
-            String filename = "output_testLex.txt";
+            String filename = "output_testSnakeLex.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
             // Start the search
@@ -191,17 +192,25 @@ public class OpLexVsOpRevLexVsHybrid {
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
 
-            return new Result(solutionCount, elapsedTime);
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
         } catch (IloException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
     public static Result testAntiLex(int[] DEGREE) {
         try {
             int N = DEGREE.length; // Example size of adjacency matrix
@@ -266,9 +275,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
 
             // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
-            String filename = "output_testLex.txt";
+            String filename = "output_testAntiLex.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
             // Start the search
@@ -296,17 +303,26 @@ public class OpLexVsOpRevLexVsHybrid {
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
 
-            return new Result(solutionCount, elapsedTime);
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
+
         } catch (IloException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
 
     public static Result testLex(int[] DEGREE) {
         try {
@@ -338,10 +354,8 @@ public class OpLexVsOpRevLexVsHybrid {
 
 
             // Constraint 3: Symmetry breaking Opt Lex
-            /* OK WORKS FINE*/
-            // Double Lex: Lex on rows + Lex on columns
-            for (int i = 0; i < N-1; i++) {
-                for (int j = i+1; j < N; j++) {
+            for (int i = 0; i < N - 1; i++) {
+                for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         cp.add(cp.lexicographic(MATRIX[i], MATRIX[j]));           // Rows
                     }
@@ -369,12 +383,8 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
             }*/
 
-
-
-
-
            /*
-            // Lex on columns (by transposing logic)
+            // Lex on columns (by transposing logic) // USED FOR COLS and DOUBLE LEX
             for (int i = 0; i < N-1; i++) {
                 for (int j = i+1; j < N; j++) {
                     IloIntVar[] colI = new IloIntVar[N];
@@ -387,26 +397,15 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
             }*/
             // Configure solver for memory optimization
-            /*cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
             cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
             cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display*/
-            cp.setParameter(IloCP.IntParam.Workers, 1);
-           // cp.setParameter(IloCP.IntParam.RandomSeed, seed);
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
 
-// DO NOT force search type
-// cp.setParameter(IloCP.IntParam.SearchType, ...); ❌
-
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Medium);
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet);
 
             // Measure execution time
             long startTime = System.currentTimeMillis();
 
-
-            // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
             String filename = "output_testLex.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
@@ -414,7 +413,7 @@ public class OpLexVsOpRevLexVsHybrid {
             cp.startNewSearch();
             int solutionCount = 0;
             boolean ok = false;
-           /* while (cp.next()) {
+            while (cp.next()) {
                 solutionCount++;
                 ok = true;
                 //System.out.print(" \n");
@@ -428,26 +427,31 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
                 writer.println();
                 writer.println();
-            }*/
-            while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
             }
+               /*while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }*/
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
-            System.out.println( "NumberOfFails: " + cp.getInfo(IloCP.IntInfo.NumberOfFails));
-            System.out.println(  "NumberOfBranches: " +  cp.getInfo(IloCP.IntInfo.NumberOfBranches));
-            return new Result(solutionCount, elapsedTime);
+
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
         } catch (IloException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
-
 
 
     public static Result testOptimizedLex(int[] DEGREE) {
@@ -469,7 +473,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Constraint 2: Define Degree Constraint
             for (int i = 0; i < N; i++) {
                 cp.addEq(cp.sum(MATRIX[i]), DEGREE[i]);
-               // cp.addLe(cp.sum(MATRIX[i]), DEGREE[i]); // Used for Bounded Graphs
+                // cp.addLe(cp.sum(MATRIX[i]), DEGREE[i]); // Used for Bounded Graphs
             }
 
             // Constraint 3: Symmetry of the Adjacency matrix
@@ -483,7 +487,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Constraint 3: Symmetry breaking Opt Lex
             /* OK WORKS FINE*/
 
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if ((DEGREE[i] == DEGREE[j])) {
                         IloIntExpr[] reversedMatrixI = arrayNew(MATRIX[i], i, j);
@@ -515,22 +519,21 @@ public class OpLexVsOpRevLexVsHybrid {
             cp.startNewSearch();
             int solutionCount = 0;
             boolean ok = false;
-            /*while (cp.next()) {
+            while (cp.next()) {
                 solutionCount++;
                 ok = true;
-
-                System.out.print(" \n");
+                //System.out.print(" \n");
                 for (int i = 0; i < N; i++) {
                     for (int j = 0; j < N; j++) {
                         //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
                         writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
                     }
-                   // System.out.print(" \n");
+                    //System.out.print(" \n");
                     writer.println();
                 }
                 writer.println();
                 writer.println();
-            }*/
+            }
             /*while (cp.next()) {
                 // 🔥 Your "callback"
                 int[][] currentMatrix = new int[N][N];
@@ -548,22 +551,31 @@ public class OpLexVsOpRevLexVsHybrid {
                 solutionCount++; // Count solutions without storing them
 
             }*/
-             while (cp.next()) {
+           /* while (cp.next()) {
                 solutionCount++; // Count solutions without storing them
-            }
+            }*/
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
-            return new Result(solutionCount, elapsedTime);
+
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
         } catch (IloException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
     public static Result testOptimizedLexCon(int[] DEGREE) {
         try {
             int N = DEGREE.length; // Example size of adjacency matrix
@@ -595,7 +607,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             // Constraint 3: Symmetry breaking Opt Lex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if ((DEGREE[i] == DEGREE[j])) {
                         IloIntExpr[] reversedMatrixI = arrayNew(MATRIX[i], i, j);
@@ -698,7 +710,7 @@ public class OpLexVsOpRevLexVsHybrid {
                     for (int j = 0; j < N; j++) {
                         //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
                         writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                     }
+                    }
                     //System.out.print(" \n");
                     writer.println();
                 }
@@ -711,19 +723,24 @@ public class OpLexVsOpRevLexVsHybrid {
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
 
-            return new Result(solutionCount, elapsedTime);
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
         } catch (IloException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
-
-
 
 
     public static Result testOptimizedLexConKKtree(int[] DEGREE) {
@@ -760,7 +777,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             // Constraint 3: Symmetry breaking Opt Lex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if ((DEGREE[i] == DEGREE[j])) {
                         IloIntExpr[] reversedMatrixI = arrayNew(MATRIX[i], i, j);
@@ -824,13 +841,13 @@ public class OpLexVsOpRevLexVsHybrid {
 
             // Constraint K-TREEE
             // K-Tree Constraint
-            for (int i = 0; i < N-1-K; i++) {
+            for (int i = 0; i < N - 1 - K; i++) {
                 IloIntExpr rowSum = cp.constant(0);
-                for (int j = i + 1; j < N ; j++) {
+                for (int j = i + 1; j < N; j++) {
                     rowSum = cp.sum(rowSum, MATRIX[i][j]);
                 }
                 //cp.addLe(rowSum, K);
-                cp.add(cp.le(rowSum, K) );
+                cp.add(cp.le(rowSum, K));
             }
 
 
@@ -854,7 +871,6 @@ public class OpLexVsOpRevLexVsHybrid {
             }
             System.out.println("SUM EDGE :" + (2* K * N - K * (K+1)));
             cp.add(cp.le(allSum, 2* K * N - K * (K+1) ) );*/
-
 
 
             // Constraint Of connectivity using Upper Off-Diagonal Technique
@@ -902,7 +918,7 @@ public class OpLexVsOpRevLexVsHybrid {
                 writer.println();
                 writer.println();
             }*/
-               while (cp.next()) {
+            while (cp.next()) {
                 solutionCount++; // Count solutions without storing them
             }
             writer.close();
@@ -963,7 +979,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntExpr[] reversedMatrixI = reverseArray(MATRIX[i]);
@@ -1013,32 +1029,18 @@ public class OpLexVsOpRevLexVsHybrid {
             }*/
 
 
-
-
-
-
             // Configure solver for memory optimization
-      /*cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
+            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
             cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
             cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display*/
+            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
 
 
-            cp.setParameter(IloCP.IntParam.Workers, 1);
-            // cp.setParameter(IloCP.IntParam.RandomSeed, seed);
-
-            // DO NOT force search type
-            // cp.setParameter(IloCP.IntParam.SearchType, ...); ❌
-
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Medium);
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet);
 
             // Measure execution time
             long startTime = System.currentTimeMillis();
 
             // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
             String filename = "output_testRevLex.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
@@ -1046,7 +1048,7 @@ public class OpLexVsOpRevLexVsHybrid {
             cp.startNewSearch();
             int solutionCount = 0;
             boolean ok = false;
-            /*while (cp.next()) {
+            while (cp.next()) {
                 solutionCount++;
                 ok = true;
                 //System.out.print(" \n");
@@ -1060,20 +1062,25 @@ public class OpLexVsOpRevLexVsHybrid {
                 }
                 writer.println();
                 writer.println();
-            }*/
-               while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
             }
+            /*while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }*/
             writer.close();
             cp.endSearch(); // End the search
 
 // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
-            System.out.println( "NumberOfFails: " + cp.getInfo(IloCP.IntInfo.NumberOfFails));
-            System.out.println(  "NumberOfBranches: " +  cp.getInfo(IloCP.IntInfo.NumberOfBranches));
 
-            return new Result(solutionCount, elapsedTime);
+// Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            // return new Result(solutionCount, elapsedTime);
 
         } catch (IloException e) {
             throw new RuntimeException(e);
@@ -1081,7 +1088,6 @@ public class OpLexVsOpRevLexVsHybrid {
             throw new RuntimeException(e);
         }
     }
-
 
 
     public static Result testOptimizedRevLex(int[] DEGREE) {
@@ -1124,7 +1130,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
@@ -1144,8 +1150,6 @@ public class OpLexVsOpRevLexVsHybrid {
             long startTime = System.currentTimeMillis();
 
             // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
             String filename = "output_testOptimizedRevLex.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
@@ -1153,32 +1157,40 @@ public class OpLexVsOpRevLexVsHybrid {
             cp.startNewSearch();
             int solutionCount = 0;
             boolean ok = false;
-            /*while (cp.next()) {
+            while (cp.next()) {
                 solutionCount++;
                 ok = true;
-                System.out.print(" \n");
+                //System.out.print(" \n");
                 for (int i = 0; i < N; i++) {
                     for (int j = 0; j < N; j++) {
-                        System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
+                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
                         writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
                     }
-                    System.out.print(" \n");
+                    //System.out.print(" \n");
                     writer.println();
                 }
                 writer.println();
                 writer.println();
-            }*/
-            while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
             }
+           /* while (cp.next()) {
+                solutionCount++; // Count solutions without storing them
+            }*/
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
 
-            return new Result(solutionCount, elapsedTime);
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
+
 
         } catch (IloException e) {
             throw new RuntimeException(e);
@@ -1227,7 +1239,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
@@ -1290,13 +1302,13 @@ public class OpLexVsOpRevLexVsHybrid {
 
             // Constraint K-TREEE
             // K-Tree Constraint
-            for (int i = 0; i < N-1-K; i++) {
+            for (int i = 0; i < N - 1 - K; i++) {
                 IloIntExpr rowSum = cp.constant(0);
-                for (int j = i + 1; j < N ; j++) {
+                for (int j = i + 1; j < N; j++) {
                     rowSum = cp.sum(rowSum, MATRIX[i][j]);
                 }
                 //cp.addLe(rowSum, K);
-                cp.add(cp.le(rowSum, K) );
+                cp.add(cp.le(rowSum, K));
             }
 
 
@@ -1310,7 +1322,6 @@ public class OpLexVsOpRevLexVsHybrid {
             }
             System.out.println("SUM EDGE :" + (2* K * N - K * (K+1)));
             cp.add(cp.le(allSum, 2* K * N - K * (K+1) ) );*/
-
 
 
             // Constraint Of connectivity using Upper Off-Diagonal Technique
@@ -1335,7 +1346,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Create timestamp for filename
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
             String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedRevLex.txt";
+            String filename = "output_testOptimizedRevLexConKKtree.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
             // Start the search
@@ -1375,6 +1386,7 @@ public class OpLexVsOpRevLexVsHybrid {
             throw new RuntimeException(e);
         }
     }
+
     public static Result testOptimizedRevLexCon(int[] DEGREE) {
         try {
             int N = DEGREE.length; // Example size of adjacency matrix
@@ -1414,7 +1426,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
@@ -1477,8 +1489,6 @@ public class OpLexVsOpRevLexVsHybrid {
             }
 
 
-
-
             // Constraint Of connectivity using Upper Off-Diagonal Technique
             /*for (int i = 0; i < N; i++) {
                 // Ensure that the sum of the subarray from i+1 to N is greater than 0
@@ -1501,7 +1511,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Create timestamp for filename
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
             String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedRevLex.txt";
+            String filename = "output_testOptimizedRevLexCon.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
             // Start the search
@@ -1529,11 +1539,18 @@ public class OpLexVsOpRevLexVsHybrid {
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
 
-            return new Result(solutionCount, elapsedTime);
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
 
         } catch (IloException e) {
             throw new RuntimeException(e);
@@ -1568,7 +1585,7 @@ public class OpLexVsOpRevLexVsHybrid {
                 IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
                 // Add the constraint
                 cp.addEq(sumExceptDiagonal, DEGREE[i]);
-               // cp.addLe(sumExceptDiagonal, DEGREE[i]);  // used for Bounded Graphs
+                // cp.addLe(sumExceptDiagonal, DEGREE[i]);  // used for Bounded Graphs
             }
 
 
@@ -1582,7 +1599,7 @@ public class OpLexVsOpRevLexVsHybrid {
 
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
@@ -1683,7 +1700,7 @@ public class OpLexVsOpRevLexVsHybrid {
             // Create timestamp for filename
             SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
             String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedRevLex.txt";
+            String filename = "output_testOptimizedRevLexConDiag.txt";
             PrintWriter writer = new PrintWriter(new FileWriter(filename));
 
             // Start the search
@@ -1705,17 +1722,24 @@ public class OpLexVsOpRevLexVsHybrid {
                 writer.println();
                 writer.println();
             }*/
-               while (cp.next()) {
+            while (cp.next()) {
                 solutionCount++; // Count solutions without storing them
             }
             writer.close();
             cp.endSearch(); // End the search
 
-// Measure and print execution time
+            // Measure and print execution time
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
 
-            return new Result(solutionCount, elapsedTime);
+            // Collect solver diagnostics
+            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
+            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
+            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
+            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
+
+            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
+            //return new Result(solutionCount, elapsedTime);
 
         } catch (IloException e) {
             throw new RuntimeException(e);
@@ -1768,32 +1792,32 @@ public class OpLexVsOpRevLexVsHybrid {
             }
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         int d = DEGREE[i];
-                        int n= N;
+                        int n = N;
                         IloIntExpr[] arrI;
                         IloIntExpr[] arrJ;
                         if (d % 2 == 0) {        // even degree
-                            if (d <= n / 2){
+                            if (d <= n / 2) {
                                 // reverse order
-                                arrI =  reverseArrayNew(MATRIX[i], i, j);
-                                arrJ =  reverseArrayNew(MATRIX[j], i, j);
+                                arrI = reverseArrayNew(MATRIX[i], i, j);
+                                arrJ = reverseArrayNew(MATRIX[j], i, j);
                             } else {
                                 // normal order
-                                arrI =  arrayNew(MATRIX[i], i, j);
-                                arrJ =  arrayNew(MATRIX[j], i, j);
+                                arrI = arrayNew(MATRIX[i], i, j);
+                                arrJ = arrayNew(MATRIX[j], i, j);
                             }
-                        }else{
-                            if (d < n / 2){
+                        } else {
+                            if (d < n / 2) {
                                 // reverse order
-                                arrI =  reverseArrayNew(MATRIX[i], i, j);
-                                arrJ =  reverseArrayNew(MATRIX[j], i, j);
+                                arrI = reverseArrayNew(MATRIX[i], i, j);
+                                arrJ = reverseArrayNew(MATRIX[j], i, j);
                             } else {
                                 // normal order
-                                arrI =  arrayNew(MATRIX[i], i, j);
-                                arrJ =  arrayNew(MATRIX[j], i, j);
+                                arrI = arrayNew(MATRIX[i], i, j);
+                                arrJ = arrayNew(MATRIX[j], i, j);
                             }
                         }
                         cp.add(cp.lexicographic(arrI, arrJ));
@@ -1844,6 +1868,7 @@ public class OpLexVsOpRevLexVsHybrid {
             throw new RuntimeException(e);
         }
     }
+
     public static Result testHybridLexRevLexAntiLexAntiRevLex(int[] DEGREE) {
         try {
 
@@ -1887,32 +1912,32 @@ public class OpLexVsOpRevLexVsHybrid {
             }
             //   Constraint 3: Symmetry breaking RevLex
             /* OK WORKS FINE*/
-            for (int i = 0; i < N-1; i++) {
+            for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
                         int d = DEGREE[i];
-                        int n= N;
+                        int n = N;
                         IloIntExpr[] arrI;
                         IloIntExpr[] arrJ;
                         if (d % 2 == 0) {        // even degree
-                            if (d <= n / 2){
+                            if (d <= n / 2) {
                                 // reverse order
-                                arrI =  reverseArrayNew(MATRIX[i], i, j);
-                                arrJ =  reverseArrayNew(MATRIX[j], i, j);
+                                arrI = reverseArrayNew(MATRIX[i], i, j);
+                                arrJ = reverseArrayNew(MATRIX[j], i, j);
                             } else {
                                 // normal order
-                                arrI =  arrayNew(MATRIX[i], i, j);
-                                arrJ =  arrayNew(MATRIX[j], i, j);
+                                arrI = arrayNew(MATRIX[i], i, j);
+                                arrJ = arrayNew(MATRIX[j], i, j);
                             }
-                        }else{
-                            if (d < n / 2){
+                        } else {
+                            if (d < n / 2) {
                                 // reverse order
-                                arrI =  reverseArrayNew(MATRIX[i], i, j);
-                                arrJ =  reverseArrayNew(MATRIX[j], i, j);
+                                arrI = reverseArrayNew(MATRIX[i], i, j);
+                                arrJ = reverseArrayNew(MATRIX[j], i, j);
                             } else {
                                 // normal order
-                                arrI =  arrayNew(MATRIX[i], i, j);
-                                arrJ =  arrayNew(MATRIX[j], i, j);
+                                arrI = arrayNew(MATRIX[i], i, j);
+                                arrJ = arrayNew(MATRIX[j], i, j);
                             }
                         }
                         cp.add(cp.lexicographic(arrI, arrJ));
@@ -1963,6 +1988,7 @@ public class OpLexVsOpRevLexVsHybrid {
             throw new RuntimeException(e);
         }
     }
+
     public static Result testHybridLexRevLexByGroup(int[] DEGREE) {
         try {
 
@@ -2008,7 +2034,6 @@ public class OpLexVsOpRevLexVsHybrid {
             /* OK WORKS FINE*/
 
 
-
             // --- Constraint 4: Symmetry breaking (reverse lex order within same degree group) ---
             Map<Integer, List<Integer>> degreeGroups = new HashMap<>();
             for (int i = 0; i < DEGREE.length; i++) {
@@ -2031,7 +2056,7 @@ public class OpLexVsOpRevLexVsHybrid {
                         int vj = group.get(j);  // graph node index
                         IloIntExpr[] arrI, arrJ;
                         if (d % 2 == 0) {        // even degree
-                            if (d <= n / 2){
+                            if (d <= n / 2) {
                                 // reverse order
                                 arrI = reverseArrayNewGroup(MATRIX[vi], group, vi, vj);
                                 arrJ = reverseArrayNewGroup(MATRIX[vj], group, vi, vj);
@@ -2040,8 +2065,8 @@ public class OpLexVsOpRevLexVsHybrid {
                                 arrI = arrayNewGroup(MATRIX[vi], group, vi, vj);
                                 arrJ = arrayNewGroup(MATRIX[vj], group, vi, vj);
                             }
-                        }else{
-                            if (d < n / 2){
+                        } else {
+                            if (d < n / 2) {
                                 // reverse order
                                 arrI = reverseArrayNewGroup(MATRIX[vi], group, vi, vj);
                                 arrJ = reverseArrayNewGroup(MATRIX[vj], group, vi, vj);
@@ -2055,7 +2080,6 @@ public class OpLexVsOpRevLexVsHybrid {
                     }
                 }
             }
-
 
 
             // Configure solver for memory optimization
@@ -2101,8 +2125,6 @@ public class OpLexVsOpRevLexVsHybrid {
     }
 
 
-
-
     public static IloIntExpr[] reverseArray(IloIntExpr[] array) throws IloException {
         int length = array.length;
         IloIntExpr[] reversedArray = new IloIntExpr[length];
@@ -2113,7 +2135,6 @@ public class OpLexVsOpRevLexVsHybrid {
 
         return reversedArray;
     }
-
 
 
     public static IloIntExpr[] arrayNewGroup(IloIntVar[] row, List<Integer> groupIndices, int exclude1, int exclude2) throws IloException {
@@ -2174,7 +2195,6 @@ public class OpLexVsOpRevLexVsHybrid {
 
         return result;
     }
-
 
 
     public static IloIntExpr[] arraySlice(IloIntExpr[] array, int start) {
