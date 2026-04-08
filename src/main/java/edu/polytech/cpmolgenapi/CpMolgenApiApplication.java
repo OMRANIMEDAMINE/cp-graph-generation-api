@@ -30,10 +30,11 @@ public class CpMolgenApiApplication {
             Result Lex = OpLexVsOpRevLexVsHybrid.testLex(sample.degrees);
             Result RevLex = OpLexVsOpRevLexVsHybrid.testRevLex(sample.degrees); // or CoLex
             Result AntiLex = OpLexVsOpRevLexVsHybrid.testAntiLex(sample.degrees);
-            Result Snake = OpLexVsOpRevLexVsHybrid.testSnake(sample.degrees);
+             Result Snake = OpLexVsOpRevLexVsHybrid.testSnake(sample.degrees);
             Result optLex = OpLexVsOpRevLexVsHybrid.testOptimizedLex(sample.degrees);
             Result optRevLex = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(sample.degrees);
             Result optLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedLexWithCanocialChecker(sample.degrees);
+            Result optAntiLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedAntiLexWithCanocialChecker(sample.degrees);
             Result optRevLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexWithCanocialChecker(sample.degrees);
             Result optLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(sample.degrees);
             Result optRevLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(sample.degrees);
@@ -51,6 +52,7 @@ public class CpMolgenApiApplication {
             IsomorphismData isoOptRevLex = analyzeIsomorphism("output_testOptimizedRevLex.txt");
             IsomorphismData isoOptLexWithCC = analyzeIsomorphism("output_testOptimizedLexWithCC.txt");
             IsomorphismData isoOptRevLexWithCC = analyzeIsomorphism("output_testOptimizedRevLexWithCC.txt");
+            IsomorphismData isoOptAntiLexWithCC = analyzeIsomorphism("output_testOptimizedAntiLexWithCC.txt");
 
             System.out.printf("LEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoLex.isoRate, isoLex.totalCount, isoLex.uniqueCount);
             System.out.printf("REVLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoRevLex.isoRate, isoRevLex.totalCount, isoRevLex.uniqueCount);
@@ -58,6 +60,7 @@ public class CpMolgenApiApplication {
             System.out.printf("OPTREVLEX: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptRevLex.isoRate, isoOptRevLex.totalCount, isoOptRevLex.uniqueCount);
             System.out.printf("OPTLEXWithCC: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptLexWithCC.isoRate, isoOptLexWithCC.totalCount, isoOptLexWithCC.uniqueCount);
             System.out.printf("OPTREVLEXWWithCC: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptRevLexWithCC.isoRate, isoOptRevLexWithCC.totalCount, isoOptRevLexWithCC.uniqueCount);
+            System.out.printf("OPTANTILEXWWithCC: isoRate: %.2f totalCount: %d uniqueCount: %d%n", isoOptAntiLexWithCC.isoRate, isoOptAntiLexWithCC.totalCount, isoOptAntiLexWithCC.uniqueCount);
 
             // Print each result individually
             System.out.println("\n=== Sample: " + sample.name + " ===\n");
@@ -70,6 +73,7 @@ public class CpMolgenApiApplication {
             printSingleResult("OptRevLex", optRevLex);
             printSingleResult("optLexWithCanocialChecker", optLexWithCC);
             printSingleResult("optRevLexWithCanocialChecker", optRevLexWithCC);
+            printSingleResult("optAntiLexWithCanocialChecker", optAntiLexWithCC);
 
 
             printSingleResult("OptLexCon", optLexCon);

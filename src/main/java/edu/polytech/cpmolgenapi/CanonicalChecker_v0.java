@@ -1,58 +1,17 @@
 package edu.polytech.cpmolgenapi;
 
-public class CanonicalChecker {
-
-
-    public static int[][] reverseMatrixInPlace(int[][] B) {
-        int n = B.length;
-        int half = (n * n) / 2;
-
-        for (int k = 0; k < half; k++) {
-            int i = k / n, j = k % n;
-            int ri = n - 1 - i, rj = n - 1 - j;
-
-            int tmp = B[i][j];
-            B[i][j] = B[ri][rj];
-            B[ri][rj] = tmp;
-        }
-
-        return B;
-    }
+public class CanonicalChecker_v0 {
 
     /* =========================================================
        MAIN VERIFICATION FUNCTION
        ========================================================= */
-    public static boolean verifyCanonicalAntiLex(int[][] currentMatrix) {
-        //int[][] C = complement(currentMatrix);
-        //int[][] D = antiLexOrder(C);
-        //int[][] E = complement(D);
-        int[][] C = deepCopy(currentMatrix);
-        int[][] E1 = reverseMatrixInPlace(C);
-        int[][] E2 = antiLexOrder(E1);
+    public static boolean verifyCanonical(int[][] currentMatrix) {
+        int[][] C = complement(currentMatrix);
+        int[][] D = antiLexOrder(C);
+        int[][] E = complement(D);
+        int[][] F = antiLexOrder(E);
 
-        return lexCompareSimple(currentMatrix, E2) >= 0;
-    }
-    public static boolean verifyCanonicalRevLEx(int[][] currentMatrix) {
-        //int[][] C = complement(currentMatrix);
-        //int[][] D = antiLexOrder(C);
-        //int[][] E = complement(D);
-        int[][] C1 = deepCopy(currentMatrix);
-        int[][] C2 = deepCopy(currentMatrix);
-        int[][] E1 = reverseMatrixInPlace(C1);
-        int[][] E2 = antiLexOrder(C2);
-
-        return lexCompareSimple(E1, E2) >= 0;
-    }
-    public static boolean verifyCanonicalLex(int[][] currentMatrix) {
-        //int[][] C = complement(currentMatrix);
-        //int[][] D = antiLexOrder(C);
-        //int[][] E = complement(D);
-        int[][] C1 = deepCopy(currentMatrix);
-        int[][] C2 = deepCopy(currentMatrix);
-        int[][] E1 = reverseMatrixInPlace(C1);
-        int[][] E2 = antiLexOrder(C2);
-
-        return lexCompareSimple(E1, E2) >= 0;
+        return lexCompareSimple(currentMatrix, F) >= 0;
     }
 
     /* =========================================================
@@ -77,10 +36,9 @@ public class CanonicalChecker {
     /* =========================================================
        ANTI-LEX ORDERING (ROW + COLUMN SWAPS)
        ========================================================= */
-
     public static int[][] antiLexOrder(int[][] A) {
         int n = A.length;
-        int[][] mat = A;
+        int[][] mat = A; //deepCopy(A);
         boolean improved = true;
         int iteration = 0;
         int maxIter = 10000;
@@ -88,7 +46,7 @@ public class CanonicalChecker {
         while (improved && iteration < maxIter) {
             improved = false;
             iteration++;
-
+            outer:
             for (int i = n - 1; i >= 1; i--) {
                 for (int j = 0; j < i; j++) {
                     for (int k = 0; k < n; k++) {
@@ -97,18 +55,36 @@ public class CanonicalChecker {
                                 swapRows(mat, i, j);
                                 swapCols(mat, i, j);
                                 improved = true;
-                                break; // only breaks k-loop, i and j loops continue
-                            } else if (mat[i][k] == 0 && mat[j][k] == 1) {
-                                break; // only breaks k-loop
+                                break outer;
+                            }
+                            else if (mat[i][k] == 0 && mat[j][k] == 1) {
+                                break;
                             }
                         }
                     }
                 }
             }
+            /*for (int i = 0; i < n - 1; i++) {
+                for (int j = i + 1; j < n; j++) {
+                    for (int k = 0; k < n; k++) {
+                        if (k != i && k != j) {
+                            if (mat[i][k] == 0 && mat[j][k] == 1) {
+                                swapRows(mat, i, j);
+                                swapCols(mat, i, j);
+                                improved = true;
+                                break outer;
+                            }
+                            else if (mat[i][k] == 1 && mat[j][k] == 0) {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }*/
         }
 
         if (improved) {
-            System.out.println("Warning: reached maxIter=" + maxIter + " and still improving → may not have converged");
+            System.out.println("⚠ Warning: antiLex may not have converged");
         }
 
         return mat;
