@@ -3,114 +3,108 @@ package edu.polytech.cpmolgenapi;
 /**
  * Benchmark instances used in the paper:
  *
- *   "RevLex Ordering and Upper Off-Diagonal Connectivity Constraints:
- *    A Synergistic Approach for Connected Non-Isomorphic Graph Enumeration"
+ * <p>"RevLex Ordering and Upper Off-Diagonal Connectivity Constraints:
+ * A Synergistic Approach for Connected Non-Isomorphic Graph Enumeration"
  *
- * All instances are d-regular graphs K_n(d), i.e., every vertex has
- * exactly degree d.  We restrict to d < n/2 since graph complementation
- * gives a one-to-one correspondence between K_n(d) and K_n(n-1-d).
+ * <p>All instances are d-regular graphs K_n(d) (every vertex has degree d).
+ * The benchmark is restricted to d &lt; n/2; graph complementation gives a
+ * one-to-one correspondence between K_n(d) and K_n(n−1−d), so the regime
+ * d ≥ n/2 requires no separate treatment.
  *
- * Instance naming convention:  K_n(d)  →  "Kn_d"
- * e.g. K_8(3) is named "K8_3".
+ * <p>Naming convention: K_n(d) → {@code "Kn_d"}, e.g. K_8(3) → {@code "K8_3"}.
  *
- * The instances below match exactly the rows reported in Table 1 of the
- * paper, grouped by degree family.
+ * <p>The instances match exactly the rows of Table 1 in the paper, grouped
+ * by degree family.
  */
 public class PaperBenchmarkData {
 
-    /**
-     * All benchmark instances used in the paper experiments.
-     * Each {@link TestCase} holds the instance name, the degree sequence
-     * (all equal to d for a d-regular graph), and a human-readable description.
-     */
+    /** All benchmark instances, in paper-table order. */
     public static final TestCase[] GRAPH_SAMPLES = {
 
             // =====================================================================
-            // DEGREE 2  —  2-regular graphs (unions of cycles)
+            // d = 2  —  2-regular graphs (disjoint unions of cycles)
             // =====================================================================
             new TestCase("K5_2",
                     new int[]{2, 2, 2, 2, 2},
-                    "2-regular graph on 5 vertices"),
+                    "K_5(2): 2-regular on 5 vertices"),
 
             new TestCase("K6_2",
                     new int[]{2, 2, 2, 2, 2, 2},
-                    "2-regular graph on 6 vertices"),
+                    "K_6(2): 2-regular on 6 vertices"),
 
             new TestCase("K8_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2},
-                    "2-regular graph on 8 vertices"),
+                    "K_8(2): 2-regular on 8 vertices"),
 
             new TestCase("K10_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-                    "2-regular graph on 10 vertices"),
+                    "K_10(2): 2-regular on 10 vertices"),
 
             new TestCase("K12_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-                    "2-regular graph on 12 vertices"),
+                    "K_12(2): 2-regular on 12 vertices"),
 
             new TestCase("K14_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-                    "2-regular graph on 14 vertices"),
+                    "K_14(2): 2-regular on 14 vertices"),
 
             new TestCase("K16_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
-                    "2-regular graph on 16 vertices"),
+                    "K_16(2): 2-regular on 16 vertices"),
 
             // =====================================================================
-            // DEGREE 3  —  cubic graphs
-            // Note: 3-regular requires n even (n*d must be even).
+            // d = 3  —  cubic (3-regular) graphs
+            // Note: 3-regular requires n even (n·d must be even).
             // =====================================================================
             new TestCase("K6_3",
                     new int[]{3, 3, 3, 3, 3, 3},
-                    "3-regular graph on 6 vertices"),
+                    "K_6(3): 3-regular on 6 vertices  [hybrid boundary: 2d==n, d odd → Lex]"),
 
             new TestCase("K8_3",
                     new int[]{3, 3, 3, 3, 3, 3, 3, 3},
-                    "3-regular graph on 8 vertices"),
+                    "K_8(3): 3-regular on 8 vertices"),
 
             new TestCase("K10_3",
                     new int[]{3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-                    "3-regular graph on 10 vertices (Petersen family)"),
+                    "K_10(3): 3-regular on 10 vertices (Petersen family)"),
 
             new TestCase("K12_3",
                     new int[]{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-                    "3-regular graph on 12 vertices"),
+                    "K_12(3): 3-regular on 12 vertices"),
 
-            // K14_3 exceeds the 300-second time limit for all configurations;
-            // it is included here so the solver records partial candidate counts.
             new TestCase("K14_3",
                     new int[]{3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3},
-                    "3-regular graph on 14 vertices (timeout expected)"),
+                    "K_14(3): 3-regular on 14 vertices (timeout expected for some configs)"),
 
             // =====================================================================
-            // DEGREE 4  —  4-regular graphs
+            // d = 4  —  4-regular graphs
             // =====================================================================
             new TestCase("K8_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4},
-                    "4-regular graph on 8 vertices"),
+                    "K_8(4): 4-regular on 8 vertices  [hybrid boundary: 2d==n, d even → RevLex]"),
 
             new TestCase("K9_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4, 4},
-                    "4-regular graph on 9 vertices"),
+                    "K_9(4): 4-regular on 9 vertices"),
 
             new TestCase("K10_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
-                    "4-regular graph on 10 vertices"),
+                    "K_10(4): 4-regular on 10 vertices"),
 
             new TestCase("K11_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
-                    "4-regular graph on 11 vertices"),
+                    "K_11(4): 4-regular on 11 vertices"),
 
             new TestCase("K12_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
-                    "4-regular graph on 12 vertices"),
+                    "K_12(4): 4-regular on 12 vertices"),
 
             // =====================================================================
-            // DEGREE 5  —  5-regular graphs
+            // d = 5  —  5-regular graphs
             // Note: 5-regular requires n even.
             // =====================================================================
             new TestCase("K12_5",
                     new int[]{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5},
-                    "5-regular graph on 12 vertices"),
+                    "K_12(5): 5-regular on 12 vertices"),
     };
 }

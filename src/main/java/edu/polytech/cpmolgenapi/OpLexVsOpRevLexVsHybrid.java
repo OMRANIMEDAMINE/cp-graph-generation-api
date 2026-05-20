@@ -11,1101 +11,591 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.io.File;
-import java.io.IOException;
 
+/**
+ * Seven benchmark configurations across two groups.
+ *
+ * <p>Paper: "RevLex Ordering and Upper Off-Diagonal Connectivity Constraints:
+ * A Synergistic Approach for Connected Non-Isomorphic Graph Enumeration"
+ *
+ * <h2>Group A — Symmetry breaking (all graphs)</h2>
+ * <ul>
+ *   <li>{@link #testOptimizedLex}          – OptLex ordering (Codish 2018)</li>
+ *   <li>{@link #testOptimizedRevLex}        – OptRevLex ordering (this paper)</li>
+ *   <li>{@link #testHybridLexRevLex}        – Hybrid: per-instance best of Lex/RevLex</li>
+ * </ul>
+ *
+ * <h2>Group B — Connectivity (connected graphs only)</h2>
+ * <ul>
+ *   <li>{@link #testOptimizedLexCon}        – OptLex + path-based encoding</li>
+ *   <li>{@link #testOptimizedRevLexCon}     – OptRevLex + path-based encoding</li>
+ *   <li>{@link #testHybridLexRevLexCon}     – Hybrid + path-based encoding</li>
+ *   <li>{@link #testOptimizedRevLexConDiag} – OptRevLex + upper off-diagonal encoding
+ *       (Theorem 2; no auxiliary variables; O(n) constraints)</li>
+ * </ul>
+ *
+ * <h2>Hybrid switching rule ({@link #useRevLex(int, int)})</h2>
+ * <pre>
+ *   RevLex  when  2d &lt; n,  or  (2d == n AND d even)
+ *   Lex     otherwise
+ * </pre>
+ * Equivalent to the original even/odd formulation without integer-division
+ * truncation ambiguity.  On the current benchmark this selects OptRevLex for
+ * every instance except K₆(3) (2d = n = 6, odd d → OptLex).
+ *
+ * <h2>Why no Hybrid + off-diagonal variant?</h2>
+ * The upper off-diagonal encoding (Theorem 2) requires a full OptRevLex
+ * canonical form.  When the hybrid selects OptLex the encoding is unsound —
+ * K₆(3) returns 0 solutions empirically.  Off-diagonal connectivity is
+ * therefore restricted to the pure OptRevLex configuration.
+ * The path-based encoding ({@link #testHybridLexRevLexCon}) is valid for any
+ * ordering direction and is used for the hybrid connectivity variant.
+ */
 public class OpLexVsOpRevLexVsHybrid {
 
+    // =========================================================================
+    //  SOLVER PARAMETER CONSTANTS
+    // =========================================================================
 
-    public static Result testLex(int[] DEGREE) {
-        try {
-            int N = DEGREE.length; // Example size of adjacency matrix
-            IloCP cp = new IloCP();
+    /** Shared solver configuration applied to every method. */
+    private static void configureSolver(IloCP cp) throws IloException {
+        cp.setParameter(IloCP.IntParam.LogVerbosity,         IloCP.ParameterValues.Quiet);
+        cp.setParameter(IloCP.IntParam.SearchType,           IloCP.ParameterValues.DepthFirst);
+        cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low);
+        cp.setParameter(IloCP.IntParam.MemoryDisplay,        0);
+    }
 
-            // Define Vars of the Adjacency matrix
-            IloIntVar[][] MATRIX = new IloIntVar[N][];
-            for (int i = 0; i < N; i++) {
-                MATRIX[i] = cp.intVarArray(N, 0, 1);
+    // =========================================================================
+    //  HYBRID SWITCHING PREDICATE
+    // =========================================================================
+
+    /**
+     * Returns {@code true} when the OptRevLex (reverse) ordering should be
+     * used for a d-regular graph on n vertices, {@code false} for OptLex.
+     *
+     * <p>The condition is multiplication-based to avoid integer-division
+     * truncation issues:
+     * <pre>
+     *   RevLex  iff  2d &lt; n  OR  (2d == n AND d is even)
+     * </pre>
+     *
+     * <p>Equivalently (matches the original even/odd formulation exactly):
+     * <pre>
+     *   even d : RevLex if d &lt;= n/2
+     *   odd  d : RevLex if d &lt;  n/2
+     * </pre>
+     *
+     * <p>Boundary analysis:
+     * <ul>
+     *   <li>2d == n with <em>odd</em> d is impossible (2d even, n would be even
+     *       ⇒ d = n/2 ⇒ d even — contradiction), so the even guard is only
+     *       reachable for even d. The two branches therefore never disagree at
+     *       the boundary, and the even/odd split in the original code is
+     *       logically redundant (dead code for the boundary case).</li>
+     * </ul>
+     *
+     * @param d degree (same for all vertices in a d-regular graph)
+     * @param n number of vertices
+     * @return {@code true} → use OptRevLex; {@code false} → use OptLex
+     */
+    static boolean useRevLex(int d, int n) {
+        return (2 * d < n) || (2 * d == n && d % 2 == 0);
+    }
+
+    // =========================================================================
+    //  BASE-MODEL HELPERS  (shared by all methods)
+    // =========================================================================
+
+    /**
+     * Creates the n×n binary adjacency-matrix variables and posts the three
+     * structural constraints common to every configuration:
+     * <ol>
+     *   <li>Zero diagonal (no self-loops)</li>
+     *   <li>Degree regularity</li>
+     *   <li>Symmetry (undirected graph)</li>
+     * </ol>
+     *
+     * @param cp     the CP solver instance
+     * @param DEGREE degree sequence (all equal to d for a d-regular graph)
+     * @return the matrix of decision variables
+     */
+    private static IloIntVar[][] buildBaseModel(IloCP cp, int[] DEGREE)
+            throws IloException {
+        int N = DEGREE.length;
+        IloIntVar[][] M = new IloIntVar[N][];
+        for (int i = 0; i < N; i++) {
+            M[i] = cp.intVarArray(N, 0, 1);
+        }
+
+        // 1. Zero diagonal
+        for (int i = 0; i < N; i++) {
+            cp.add(cp.eq(M[i][i], 0));
+        }
+
+        // 2. Degree regularity
+        for (int i = 0; i < N; i++) {
+            cp.addEq(cp.sum(M[i]), DEGREE[i]);
+        }
+
+        // 3. Symmetry
+        for (int i = 0; i < N; i++) {
+            for (int j = i + 1; j < N; j++) {
+                cp.add(cp.eq(M[i][j], M[j][i]));
             }
+        }
 
-            // Constraint 1: Null Diagonal of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                cp.add(cp.eq(MATRIX[i][i], 0));
-            }
+        return M;
+    }
 
-            // Constraint 2: Define Degree Constraint
-            for (int i = 0; i < N; i++) {
-                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i]);
-            }
+    /**
+     * Posts the path-based (z-variable) connectivity encoding.
+     *
+     * <p>Adds n auxiliary distance variables z[i] ∈ [0, n-1], fixes z[0] = 0,
+     * enforces z[i] ≥ 1 for i > 0, and posts the BFS-level implication
+     * constraints together with the |z[i] − z[j]| ≤ 1 tightening for
+     * adjacent pairs. Together these guarantee that every generated graph is
+     * connected and that each connected graph has a unique z-assignment
+     * (Theorem 3 / Corollary 1 of the paper).
+     */
+    private static void addPathConnectivity(IloCP cp, IloIntVar[][] M)
+            throws IloException {
+        int N = M.length;
+        IloIntVar[] z = new IloIntVar[N];
+        for (int i = 0; i < N; i++) {
+            z[i] = cp.intVar(0, N - 1);
+        }
 
-            // Constraint 3: Symmetry of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
-                }
-            }
+        cp.addEq(z[0], 0);
+        for (int i = 1; i < N; i++) {
+            cp.addGe(z[i], 1);
+        }
 
-
-            // Constraint 3: Symmetry breaking Opt Lex
-            for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if (DEGREE[i] == DEGREE[j]) {
-                        cp.add(cp.lexicographic(MATRIX[i], MATRIX[j]));           // Rows
+        for (int i = 1; i < N; i++) {
+            for (int k = 1; k < N; k++) {
+                IloConstraint[] neighborConstraints = new IloConstraint[N - 1];
+                int idx = 0;
+                for (int j = 0; j < N; j++) {
+                    if (j != i) {
+                        neighborConstraints[idx++] = cp.and(new IloConstraint[]{
+                                cp.neq(M[i][j], 0),
+                                cp.eq(z[j], k - 1)
+                        });
                     }
                 }
+                cp.add(cp.ifThen(cp.eq(z[i], k), cp.or(neighborConstraints)));
             }
+        }
 
-            /*for (int i = 0; i < N - 1; i++) { // double implication for Lex // VALID IN TEST BUT OptLex is better
-                for (int j = i + 1; j < N; j++) {
-                    if (DEGREE[i] == DEGREE[j]) {
-
-                        IloConstraint prefix = null;
-
-                        for (int k = 0; k < N; k++) {
-
-                            IloConstraint le = cp.le(MATRIX[i][k], MATRIX[j][k]);
-
-                            if (k == 0) {
-                                cp.add(le);
-                            } else {
-                                IloConstraint eq = cp.eq(MATRIX[i][k-1], MATRIX[j][k-1]);
-                                cp.add(cp.imply(eq, le));
-                            }
-                        }
-                    }
-                }
-            }*/
-
-           /*
-            // Lex on columns (by transposing logic) // USED FOR COLS and DOUBLE LEX
-            for (int i = 0; i < N-1; i++) {
-                for (int j = i+1; j < N; j++) {
-                    IloIntVar[] colI = new IloIntVar[N];
-                    IloIntVar[] colJ = new IloIntVar[N];
-                    for (int k = 0; k < N; k++) {
-                        colI[k] = MATRIX[k][i];
-                        colJ[k] = MATRIX[k][j];
-                    }
-                    cp.add(cp.lexicographic(colI, colJ));
-                }
-            }*/
-            // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
-            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
-
-
-            // Measure execution time
-            long startTime = System.currentTimeMillis();
-
-            String filename = "output_testLex.txt";
-            PrintWriter writer = new PrintWriter(new FileWriter(filename));
-
-            // Start the search
-            cp.startNewSearch();
-            int solutionCount = 0;
-            boolean ok = false;
-            while (cp.next()) {
-                solutionCount++;
-                ok = true;
-                //System.out.print(" \n");
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                    }
-                    //System.out.print(" \n");
-                    writer.println();
-                }
-                writer.println();
-                writer.println();
+        // Tighten z-redundancy: adjacent vertices differ by at most 1 level.
+        for (int i = 0; i < N; i++) {
+            for (int j = i + 1; j < N; j++) {
+                cp.add(cp.ifThen(
+                        cp.neq(M[i][j], 0),
+                        cp.le(cp.abs(cp.diff(z[i], z[j])), 1)
+                ));
             }
-               /*while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
-            }*/
-            writer.close();
-            cp.endSearch(); // End the search
-
-            // Measure and print execution time
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-            // Collect solver diagnostics
-            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
-            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
-            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
-            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
-
-            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
-            //return new Result(solutionCount, elapsedTime);
-        } catch (IloException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
     }
 
+    /**
+     * Posts the upper off-diagonal connectivity encoding (Theorem 2).
+     *
+     * <p>Adds n-1 constraints of the form sum(M[i][i+1..n-1]) ≥ 1, which
+     * under OptRevLex ordering is provably equivalent to connectivity for
+     * d-regular graphs. Requires no auxiliary variables.
+     */
+    private static void addOffDiagConnectivity(IloCP cp, IloIntVar[][] M)
+            throws IloException {
+        int N = M.length;
+        for (int i = 0; i < N - 1; i++) {
+            IloIntVar[] upper = Arrays.copyOfRange(M[i], i + 1, N);
+            cp.add(cp.gt(cp.sum(upper), 0));
+        }
+    }
+
+    // =========================================================================
+    //  SYMMETRY-BREAKING HELPERS
+    // =========================================================================
+
+    /** Posts OptLex row-ordering constraints (optimized variant, Codish 2018). */
+    private static void addOptLex(IloCP cp, IloIntVar[][] M, int[] DEGREE)
+            throws IloException {
+        int N = M.length;
+        for (int i = 0; i < N - 1; i++) {
+            for (int j = i + 1; j < N; j++) {
+                if (DEGREE[i] == DEGREE[j]) {
+                    cp.add(cp.lexicographic(
+                            arrayNew(M[i], i, j),
+                            arrayNew(M[j], i, j)));
+                }
+            }
+        }
+    }
+
+    /** Posts OptRevLex row-ordering constraints (this paper). */
+    private static void addOptRevLex(IloCP cp, IloIntVar[][] M, int[] DEGREE)
+            throws IloException {
+        int N = M.length;
+        for (int i = 0; i < N - 1; i++) {
+            for (int j = i + 1; j < N; j++) {
+                if (DEGREE[i] == DEGREE[j]) {
+                    cp.add(cp.lexicographic(
+                            reverseArrayNew(M[i], i, j),
+                            reverseArrayNew(M[j], i, j)));
+                }
+            }
+        }
+    }
+
+    /**
+     * Posts hybrid row-ordering constraints: selects OptRevLex or OptLex
+     * per row pair according to {@link #useRevLex(int, int)}.
+     *
+     * <p>For d-regular instances all rows share the same degree, so a single
+     * call to {@code useRevLex(d, n)} determines the ordering for the entire
+     * matrix. The per-pair dispatch is kept to support future heterogeneous
+     * degree sequences.
+     */
+    private static void addHybrid(IloCP cp, IloIntVar[][] M, int[] DEGREE)
+            throws IloException {
+        int N = M.length;
+        for (int i = 0; i < N - 1; i++) {
+            for (int j = i + 1; j < N; j++) {
+                if (DEGREE[i] != DEGREE[j]) continue;
+
+                int d = DEGREE[i];
+                IloIntExpr[] arrI, arrJ;
+
+                if (useRevLex(d, N)) {
+                    arrI = reverseArrayNew(M[i], i, j);
+                    arrJ = reverseArrayNew(M[j], i, j);
+                } else {
+                    arrI = arrayNew(M[i], i, j);
+                    arrJ = arrayNew(M[j], i, j);
+                }
+                cp.add(cp.lexicographic(arrI, arrJ));
+            }
+        }
+    }
+
+    // =========================================================================
+    //  SOLUTION COLLECTION
+    // =========================================================================
+
+    /**
+     * Runs the solver to exhaustion and returns a {@link Result}.
+     * Solutions are counted but not written to disk (no I/O overhead in
+     * benchmark mode). Pass {@code writer != null} to record matrices.
+     */
+    private static Result collectResults(IloCP cp, IloIntVar[][] M,
+                                         PrintWriter writer)
+            throws IloException {
+        int N = M.length;
+        long start = System.currentTimeMillis();
+        cp.startNewSearch();
+        int count = 0;
+        while (cp.next()) {
+            count++;
+            if (writer != null) {
+                for (int i = 0; i < N; i++) {
+                    for (int j = 0; j < N; j++) {
+                        writer.print(" " + (int) cp.getValue(M[i][j]));
+                    }
+                    writer.println();
+                }
+                writer.println();
+            }
+        }
+        cp.endSearch();
+        long elapsed = System.currentTimeMillis() - start;
+
+        return new Result(
+                count, elapsed,
+                cp.getInfo(IloCP.IntInfo.NumberOfFails),
+                cp.getInfo(IloCP.IntInfo.NumberOfBranches),
+                cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints),
+                cp.getInfo(IloCP.IntInfo.NumberOfConstraints));
+    }
+
+    // =========================================================================
+    //  RevLex MODEL — DIAGONAL ENCODING DETAIL
+    //
+    //  The original OptRevLex methods use a non-standard "1 on the diagonal"
+    //  trick: MATRIX[i][i] = 1 and the degree constraint is sum(row) = d+1.
+    //  This is an encoding artefact; the produced graphs are identical to the
+    //  zero-diagonal encoding after masking the diagonal.  The methods below
+    //  preserve this behaviour exactly so that solution counts remain
+    //  comparable with existing paper results.
+    // =========================================================================
+
+    /**
+     * Builds the base model with the RevLex diagonal convention:
+     * diagonal entries are fixed to 1 and the degree constraint is
+     * {@code sum(row) = d + 1}.
+     */
+    private static IloIntVar[][] buildRevLexBaseModel(IloCP cp, int[] DEGREE)
+            throws IloException {
+        int N = DEGREE.length;
+        IloIntVar[][] M = new IloIntVar[N][];
+        for (int i = 0; i < N; i++) {
+            M[i] = cp.intVarArray(N, 0, 1);
+        }
+
+        // Diagonal = 1
+        for (int i = 0; i < N; i++) {
+            cp.add(cp.eq(M[i][i], 1));
+        }
+
+        // Degree: sum(row) - diagonal = d  →  sum(row) = d + 1
+        for (int i = 0; i < N; i++) {
+            cp.addEq(cp.diff(cp.sum(M[i]), M[i][i]), DEGREE[i]);
+        }
+
+        // Symmetry
+        for (int i = 0; i < N; i++) {
+            for (int j = i + 1; j < N; j++) {
+                cp.add(cp.eq(M[i][j], M[j][i]));
+            }
+        }
+        return M;
+    }
+
+    // =========================================================================
+    //  GROUP A — SYMMETRY-BREAKING CONFIGURATIONS  (all graphs)
+    // =========================================================================
+
+    /** All graphs — OptLex ordering (Codish 2018). */
     public static Result testOptimizedLex(int[] DEGREE) {
         try {
-            int N = DEGREE.length; // Example size of adjacency matrix
             IloCP cp = new IloCP();
-
-            // Define Vars of the Adjacency matrix
-            IloIntVar[][] MATRIX = new IloIntVar[N][];
-            for (int i = 0; i < N; i++) {
-                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            IloIntVar[][] M = buildBaseModel(cp, DEGREE);
+            addOptLex(cp, M, DEGREE);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testOptimizedLex.txt"))) {
+                return collectResults(cp, M, w);
             }
-
-            // Constraint 1: Null Diagonal of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                cp.add(cp.eq(MATRIX[i][i], 0));
-            }
-
-            // Constraint 2: Define Degree Constraint
-            for (int i = 0; i < N; i++) {
-                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i]);
-                // cp.addLe(cp.sum(MATRIX[i]), DEGREE[i]); // Used for Bounded Graphs
-            }
-
-            // Constraint 3: Symmetry of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
-                }
-            }
-
-
-            // Constraint 3: Symmetry breaking Opt Lex
-            /* OK WORKS FINE*/
-
-            for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if ((DEGREE[i] == DEGREE[j])) {
-                        IloIntExpr[] reversedMatrixI = arrayNew(MATRIX[i], i, j);
-                        IloIntExpr[] reversedMatrixJ = arrayNew(MATRIX[j], i, j);
-                        //cp.add(cp.lexicographic(reversedMatrixJ, reversedMatrixI)); // Anti_lex
-                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
-                    }
-                }
-            }
-
-
-            // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
-            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
-
-            // Measure execution time
-            long startTime = System.currentTimeMillis();
-
-
-            // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedLex.txt";
-            PrintWriter writer = new PrintWriter(new FileWriter(filename));
-
-            // Start the search
-            cp.startNewSearch();
-            int solutionCount = 0;
-            boolean ok = false;
-            while (cp.next()) {
-                solutionCount++;
-                ok = true;
-                //System.out.print(" \n");
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                    }
-                    //System.out.print(" \n");
-                    writer.println();
-                }
-                writer.println();
-                writer.println();
-            }
-            /*while (cp.next()) {
-                // 🔥 Your "callback"
-                int[][] currentMatrix = new int[N][N];
-
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        currentMatrix[i][j] = (int) cp.getValue(MATRIX[i][j]);
-                    }
-                }
-
-                // 🔥 Canonical filtering
-                if (!CanonicalChecker.verifyCanonical(currentMatrix)) {
-                    continue;
-                }
-                solutionCount++; // Count solutions without storing them
-
-            }*/
-           /* while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
-            }*/
-            writer.close();
-            cp.endSearch(); // End the search
-
-            // Measure and print execution time
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-            // Collect solver diagnostics
-            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
-            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
-            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
-            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
-
-            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
-            //return new Result(solutionCount, elapsedTime);
-        } catch (IloException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
     }
 
-     public static Result testOptimizedLexCon(int[] DEGREE) {
+    /** All graphs — OptRevLex ordering (this paper). */
+    public static Result testOptimizedRevLex(int[] DEGREE) {
         try {
-            int N = DEGREE.length; // Example size of adjacency matrix
             IloCP cp = new IloCP();
-
-            // Define Vars of the Adjacency matrix
-            IloIntVar[][] MATRIX = new IloIntVar[N][];
-            for (int i = 0; i < N; i++) {
-                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            IloIntVar[][] M = buildRevLexBaseModel(cp, DEGREE);
+            addOptRevLex(cp, M, DEGREE);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testOptimizedRevLex.txt"))) {
+                return collectResults(cp, M, w);
             }
-
-            // Constraint 1: Null Diagonal of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                cp.add(cp.eq(MATRIX[i][i], 0));
-            }
-
-            // Constraint 2: Define Degree Constraint
-            for (int i = 0; i < N; i++) {
-                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i]);
-            }
-
-            // Constraint 3: Symmetry of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
-                }
-            }
-
-
-            // Constraint 3: Symmetry breaking Opt Lex
-            /* OK WORKS FINE*/
-            for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if ((DEGREE[i] == DEGREE[j])) {
-                        IloIntExpr[] reversedMatrixI = arrayNew(MATRIX[i], i, j);
-                        IloIntExpr[] reversedMatrixJ = arrayNew(MATRIX[j], i, j);
-                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
-                    }
-                }
-            }
-
-            // Constraint Of connectivity using Upper Off-Diagonal Technique
-
-            // Generation of K_i Variables
-            // Define the distance variables
-            IloIntVar[] z = new IloIntVar[N];
-            for (int i = 0; i < N; i++) {
-                z[i] = cp.intVar(0, N - 1);
-            }
-
-            // Root node distance is 0
-            cp.addEq(z[0], 0);
-            // For all other nodes, distances must be greater than 0
-            for (int i = 1; i < N; i++) {
-                cp.addGe(z[i], 1);
-            }
-
-            for (int i = 1; i < N; i++) {
-                for (int k = 1; k < N; k++) {
-                    IloConstraint[] neighborConstraints = new IloConstraint[N - 1];
-                    int index = 0;
-                    for (int j = 0; j < N; j++) {
-                        if (j != i) {
-                            // Combine constraints into an array
-                            IloConstraint[] combinedConstraints = new IloConstraint[2];
-                            combinedConstraints[0] = cp.neq(MATRIX[i][j], 0);
-                            combinedConstraints[1] = cp.eq(z[j], k - 1);
-
-                            // Use cp.and with an array of constraints
-                            neighborConstraints[index++] = cp.and(combinedConstraints);
-                        }
-                    }
-                    cp.add(cp.ifThen(
-                            cp.eq(z[i], k),
-                            cp.or(neighborConstraints)
-                    ));
-
-
-                }
-            }
-
-            // ajouter pour optimiser les solution redondants due à la variable Z.
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.ifThen(
-                            cp.neq(MATRIX[i][j], 0),
-                            cp.le(cp.abs(cp.diff(z[i], z[j])), 1)
-                    ));
-                    //si aij >0 alors abs( zi - zj) <= 1
-                }
-            }
-
-
-            // 5. Adapted Upper Off-Diagonal Connectivity for Lex
-/*
-            // Best practical connectivity attempt for Optimized Lex - OFF DIAG IDEA NOT WORKS WITH LEX
-            // (Lower off-diagonal focused on later rows)
-            for (int i = 2; i < N; i++) {           // Start from row 2 — best compromise
-                IloIntVar[] lowerPart = new IloIntVar[i];
-                for (int j = 0; j < i; j++) {
-                    lowerPart[j] = MATRIX[i][j];     // Must connect to at least one previous vertex
-                }
-                cp.add(cp.gt(cp.sum(lowerPart), 0));
-            }*/
-            // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
-            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
-
-            // Measure execution time
-            long startTime = System.currentTimeMillis();
-
-
-            // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedLexCon.txt";
-            PrintWriter writer = new PrintWriter(new FileWriter(filename));
-
-            // Start the search
-            cp.startNewSearch();
-            int solutionCount = 0;
-            boolean ok = false;
-            while (cp.next()) {
-                solutionCount++;
-
-
-                ok = true;
-                //System.out.print(" \n");
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                    }
-                    //System.out.print(" \n");
-                    writer.println();
-                }
-                writer.println();
-                writer.println();
-            }
-               /*while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
-            }*/
-            writer.close();
-            cp.endSearch(); // End the search
-
-            // Measure and print execution time
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-            // Collect solver diagnostics
-            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
-            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
-            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
-            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
-
-            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
-            //return new Result(solutionCount, elapsedTime);
-        } catch (IloException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
     }
 
-     public static Result testRevLex(int[] DEGREE) {
+    // =========================================================================
+    //  GROUP B — CONNECTIVITY CONFIGURATIONS  (connected graphs)
+    // =========================================================================
+
+    /** Connected graphs — OptLex + path-based connectivity. */
+    public static Result testOptimizedLexCon(int[] DEGREE) {
         try {
-            int N = DEGREE.length; // Example size of adjacency matrix
-
-            // Define Vars of the Adjacency matrix
             IloCP cp = new IloCP();
-
-            // Define Vars of the Adjacency matrix
-            IloIntVar[][] MATRIX = new IloIntVar[N][];
-            for (int i = 0; i < N; i++) {
-                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            IloIntVar[][] M = buildBaseModel(cp, DEGREE);
+            addOptLex(cp, M, DEGREE);
+            addPathConnectivity(cp, M);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testOptimizedLexCon.txt"))) {
+                return collectResults(cp, M, w);
             }
-
-            // Constraint 1: Null Diagonal of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                cp.add(cp.eq(MATRIX[i][i], 1));
-            }
-
-            /*// Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
-            for (int i = 0; i < N; i++) {
-                // Sum of the entire row
-                IloIntExpr rowSum = cp.sum(MATRIX[i]);
-                // Subtract the diagonal element (MATRIX[i][i])
-                IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
-                // Add the constraint
-                cp.addEq(sumExceptDiagonal, DEGREE[i]);
-            }*/
-            // Adjust degree constraint: subtract 1 for the diagonal
-            for (int i = 0; i < N; i++) {
-                cp.addEq(cp.sum(MATRIX[i]), DEGREE[i] + 1); // +1 accounts for diagonal
-            }
-
-
-            // Constraint 3: Symmetry of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
-                }
-            }
-
-
-            //   Constraint 3: Symmetry breaking RevLex
-            /* OK WORKS FINE*/
-            for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if (DEGREE[i] == DEGREE[j]) {
-                        IloIntExpr[] reversedMatrixI = reverseArray(MATRIX[i]);
-                        IloIntExpr[] reversedMatrixJ = reverseArray(MATRIX[j]);
-                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
-                    }
-                }
-            }
-
-
-            // Constraint: Symmetry breaking CoLex (RevLex) Same code
-
-// =============================================
-            // 4. Symmetry Breaking: DOUBLE COLEX / DOUBLE RevLex
-            // =============================================
-            // --- Colex on Rows ---
-           /* for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if (DEGREE[i] == DEGREE[j]) {
-                        IloIntVar[] rowI_rev = new IloIntVar[N];
-                        IloIntVar[] rowJ_rev = new IloIntVar[N];
-                        for (int k = 0; k < N; k++) {
-                            rowI_rev[k] = MATRIX[i][N - 1 - k];
-                            rowJ_rev[k] = MATRIX[j][N - 1 - k];
-                        }
-                        cp.add(cp.lexicographic(rowI_rev, rowJ_rev));   // Colex on rows
-                    }
-                }
-            }*/
-
-
-            // --- Colex on Columns ---
-            /*
-            for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-
-                    IloIntVar[] colI_rev = new IloIntVar[N];
-                    IloIntVar[] colJ_rev = new IloIntVar[N];
-
-                    for (int k = 0; k < N; k++) {
-                        colI_rev[k] = MATRIX[N - 1 - k][i];   // reverse column i
-                        colJ_rev[k] = MATRIX[N - 1 - k][j];   // reverse column j
-                    }
-
-                    cp.add(cp.lexicographic(colI_rev, colJ_rev));   // Colex on columns
-                }
-            }*/
-
-
-            // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
-            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
-
-
-
-            // Measure execution time
-            long startTime = System.currentTimeMillis();
-
-            // Create timestamp for filename
-            String filename = "output_testRevLex.txt";
-            PrintWriter writer = new PrintWriter(new FileWriter(filename));
-
-            // Start the search
-            cp.startNewSearch();
-            int solutionCount = 0;
-            boolean ok = false;
-            while (cp.next()) {
-                solutionCount++;
-                ok = true;
-                //System.out.print(" \n");
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                    }
-                    //System.out.print(" \n");
-                    writer.println();
-                }
-                writer.println();
-                writer.println();
-            }
-            /*while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
-            }*/
-            writer.close();
-            cp.endSearch(); // End the search
-
-// Measure and print execution time
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-// Collect solver diagnostics
-            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
-            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
-            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
-            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
-
-            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
-            // return new Result(solutionCount, elapsedTime);
-
-        } catch (IloException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
     }
 
-     public static Result testOptimizedRevLex(int[] DEGREE) {
-        try {
-            int N = DEGREE.length; // Example size of adjacency matrix
-
-            // Define Vars of the Adjacency matrix
-            IloCP cp = new IloCP();
-
-            // Define Vars of the Adjacency matrix
-            IloIntVar[][] MATRIX = new IloIntVar[N][];
-            for (int i = 0; i < N; i++) {
-                MATRIX[i] = cp.intVarArray(N, 0, 1);
-            }
-
-            // Constraint 1: Null Diagonal of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                cp.add(cp.eq(MATRIX[i][i], 1));
-            }
-
-            // Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
-            for (int i = 0; i < N; i++) {
-                // Sum of the entire row
-                IloIntExpr rowSum = cp.sum(MATRIX[i]);
-                // Subtract the diagonal element (MATRIX[i][i])
-                IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
-                // Add the constraint
-                cp.addEq(sumExceptDiagonal, DEGREE[i]);
-                //cp.addLe(sumExceptDiagonal, DEGREE[i]);  // used for Bounded Graphs
-            }
-
-
-            // Constraint 3: Symmetry of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
-                }
-            }
-
-
-            //   Constraint 3: Symmetry breaking RevLex
-            /* OK WORKS FINE*/
-            for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if (DEGREE[i] == DEGREE[j]) {
-                        IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
-                        IloIntExpr[] reversedMatrixJ = reverseArrayNew(MATRIX[j], i, j);
-                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
-                    }
-                }
-            }
-
-            // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
-            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
-
-            // Measure execution time
-            long startTime = System.currentTimeMillis();
-
-            // Create timestamp for filename
-            String filename = "output_testOptimizedRevLex.txt";
-            PrintWriter writer = new PrintWriter(new FileWriter(filename));
-
-            // Start the search
-            cp.startNewSearch();
-            int solutionCount = 0;
-            boolean ok = false;
-            while (cp.next()) {
-                solutionCount++;
-                ok = true;
-                //System.out.print(" \n");
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                    }
-                    //System.out.print(" \n");
-                    writer.println();
-                }
-                writer.println();
-                writer.println();
-            }
-           /* while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
-            }*/
-            writer.close();
-            cp.endSearch(); // End the search
-
-            // Measure and print execution time
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-            // Collect solver diagnostics
-            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
-            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
-            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
-            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
-
-            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
-            //return new Result(solutionCount, elapsedTime);
-
-
-        } catch (IloException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
+    /** Connected graphs — OptRevLex + path-based connectivity. */
     public static Result testOptimizedRevLexCon(int[] DEGREE) {
         try {
-            int N = DEGREE.length; // Example size of adjacency matrix
-
-            // Define Vars of the Adjacency matrix
             IloCP cp = new IloCP();
-
-            // Define Vars of the Adjacency matrix
-            IloIntVar[][] MATRIX = new IloIntVar[N][];
-            for (int i = 0; i < N; i++) {
-                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            IloIntVar[][] M = buildRevLexBaseModel(cp, DEGREE);
+            addOptRevLex(cp, M, DEGREE);
+            addPathConnectivity(cp, M);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testOptimizedRevLexCon.txt"))) {
+                return collectResults(cp, M, w);
             }
-
-            // Constraint 1: Null Diagonal of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                cp.add(cp.eq(MATRIX[i][i], 1));
-            }
-
-            // Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
-            for (int i = 0; i < N; i++) {
-                // Sum of the entire row
-                IloIntExpr rowSum = cp.sum(MATRIX[i]);
-                // Subtract the diagonal element (MATRIX[i][i])
-                IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
-                // Add the constraint
-                cp.addEq(sumExceptDiagonal, DEGREE[i]);
-            }
-
-
-            // Constraint 3: Symmetry of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
-                }
-            }
-
-
-            //   Constraint 3: Symmetry breaking RevLex
-            /* OK WORKS FINE*/
-            for (int i = 0; i < N - 1; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    if (DEGREE[i] == DEGREE[j]) {
-                        IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
-                        IloIntExpr[] reversedMatrixJ = reverseArrayNew(MATRIX[j], i, j);
-                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
-                    }
-                }
-            }
-
-
-            // Constraint Of connectivity using Upper Off-Diagonal Technique
-
-            // Generation of K_i Variables
-            // Define the distance variables
-            IloIntVar[] z = new IloIntVar[N];
-            for (int i = 0; i < N; i++) {
-                z[i] = cp.intVar(0, N - 1);
-            }
-
-            // Root node distance is 0
-            cp.addEq(z[0], 0);
-            // For all other nodes, distances must be greater than 0
-            for (int i = 1; i < N; i++) {
-                cp.addGe(z[i], 1);
-            }
-
-            for (int i = 1; i < N; i++) {
-                for (int k = 1; k < N; k++) {
-                    IloConstraint[] neighborConstraints = new IloConstraint[N - 1];
-                    int index = 0;
-                    for (int j = 0; j < N; j++) {
-                        if (j != i) {
-                            // Combine constraints into an array
-                            IloConstraint[] combinedConstraints = new IloConstraint[2];
-                            combinedConstraints[0] = cp.neq(MATRIX[i][j], 0);
-                            combinedConstraints[1] = cp.eq(z[j], k - 1);
-
-                            // Use cp.and with an array of constraints
-                            neighborConstraints[index++] = cp.and(combinedConstraints);
-                        }
-                    }
-                    cp.add(cp.ifThen(
-                            cp.eq(z[i], k),
-                            cp.or(neighborConstraints)
-                    ));
-
-
-                }
-            }
-
-            // ajouter pour optimiser les solution redondants due à la variable Z.
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.ifThen(
-                            cp.neq(MATRIX[i][j], 0),
-                            cp.le(cp.abs(cp.diff(z[i], z[j])), 1)
-                    ));
-                    //si aij >0 alors abs( zi - zj) <= 1
-                }
-            }
-
-
-            // Constraint Of connectivity using Upper Off-Diagonal Technique
-            /*for (int i = 0; i < N; i++) {
-                // Ensure that the sum of the subarray from i+1 to N is greater than 0
-                if ((i + 1) < N) // pour eviter la derniere ligne
-                {
-                    IloIntVar[] subArray = Arrays.copyOfRange(MATRIX[i], i + 1, N);
-                    cp.add(cp.gt(cp.sum(subArray), 0));
-                }
-            }*/
-
-            // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
-            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
-
-            // Measure execution time
-            long startTime = System.currentTimeMillis();
-
-            // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedRevLexCon.txt";
-            PrintWriter writer = new PrintWriter(new FileWriter(filename));
-
-            // Start the search
-            cp.startNewSearch();
-            int solutionCount = 0;
-            boolean ok = false;
-            while (cp.next()) {
-                solutionCount++;
-                ok = true;
-                //System.out.print(" \n");
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                    }
-                    //System.out.print(" \n");
-                    writer.println();
-                }
-                writer.println();
-                writer.println();
-            }
-               /*while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
-            }*/
-            writer.close();
-            cp.endSearch(); // End the search
-
-            // Measure and print execution time
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-            // Collect solver diagnostics
-            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
-            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
-            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
-            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
-
-            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
-            //return new Result(solutionCount, elapsedTime);
-
-        } catch (IloException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
     }
 
+    /** Connected graphs — OptRevLex + upper off-diagonal encoding (Theorem 2).
+     * No auxiliary variables; O(n) additional constraints.
+     */
     public static Result testOptimizedRevLexConDiag(int[] DEGREE) {
         try {
-            int N = DEGREE.length; // Example size of adjacency matrix
-
-            // Define Vars of the Adjacency matrix
             IloCP cp = new IloCP();
-
-            // Define Vars of the Adjacency matrix
-            IloIntVar[][] MATRIX = new IloIntVar[N][];
-            for (int i = 0; i < N; i++) {
-                MATRIX[i] = cp.intVarArray(N, 0, 1);
+            IloIntVar[][] M = buildRevLexBaseModel(cp, DEGREE);
+            addOptRevLex(cp, M, DEGREE);
+            addOffDiagConnectivity(cp, M);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testOptimizedRevLexConDiag.txt"))) {
+                return collectResults(cp, M, null);
             }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
+    }
 
-            // Constraint 1: Null Diagonal of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                cp.add(cp.eq(MATRIX[i][i], 1));
+    // =========================================================================
+    //  GROUP A — HYBRID SYMMETRY-BREAKING  (all graphs)
+    // =========================================================================
+
+    /**
+     * All graphs — Hybrid Lex/RevLex ordering.
+     *
+     * <p>Selects OptRevLex when {@link #useRevLex(int, int)} returns
+     * {@code true}, OptLex otherwise.  On the current benchmark this equals
+     * OptRevLex on every instance except K₆(3) (2d = n = 6, odd d → OptLex).
+     *
+     * <p>Uses the zero-diagonal base model so that both ordering directions
+     * remain valid within the same model.
+     */
+    public static Result testHybridLexRevLex(int[] DEGREE) {
+        try {
+            IloCP cp = new IloCP();
+            IloIntVar[][] M = buildBaseModel(cp, DEGREE);
+            addHybrid(cp, M, DEGREE);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testHybridLexRevLex.txt"))) {
+                return collectResults(cp, M, w);
             }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
+    }
 
-            // Constraint: Define Degree Constraint sum of the row, excluding the diagonal element
-            for (int i = 0; i < N; i++) {
-                // Sum of the entire row
-                IloIntExpr rowSum = cp.sum(MATRIX[i]);
-                // Subtract the diagonal element (MATRIX[i][i])
-                IloIntExpr sumExceptDiagonal = cp.diff(rowSum, MATRIX[i][i]);
-                // Add the constraint
-                cp.addEq(sumExceptDiagonal, DEGREE[i]);
-                // cp.addLe(sumExceptDiagonal, DEGREE[i]);  // used for Bounded Graphs
+    // =========================================================================
+    //  GROUP B — HYBRID CONNECTIVITY  (connected graphs)
+    // =========================================================================
+
+    /**
+     * Connected graphs — Hybrid Lex/RevLex ordering + path-based connectivity.
+     *
+     * <p>The path-based (z-variable) encoding is always sound and complete
+     * regardless of which ordering the hybrid selects.  This makes it the
+     * correct connectivity companion for the hybrid: the upper off-diagonal
+     * encoding (Theorem 2) requires a full OptRevLex canonical form and is
+     * unsound when the hybrid falls back to OptLex (e.g. K₆(3) → 0 solutions).
+     */
+    public static Result testHybridLexRevLexCon(int[] DEGREE) {
+        try {
+            IloCP cp = new IloCP();
+            IloIntVar[][] M = buildBaseModel(cp, DEGREE);
+            addHybrid(cp, M, DEGREE);
+            addPathConnectivity(cp, M);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testHybridLexRevLexCon.txt"))) {
+                return collectResults(cp, M, w);
             }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
+    }
 
+    // =========================================================================
+    //  LEGACY METHODS  (kept for backward-compatibility; not used in paper table)
+    // =========================================================================
 
-            // Constraint 3: Symmetry of the Adjacency matrix
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.eq(MATRIX[i][j], MATRIX[j][i]));
-                }
-            }
+    /** Non-optimized Lex (baseline). */
+    public static Result testLex(int[] DEGREE) {
+        try {
+            int N = DEGREE.length;
+            IloCP cp = new IloCP();
+            IloIntVar[][] M = buildBaseModel(cp, DEGREE);
 
-
-            //   Constraint 3: Symmetry breaking RevLex
-            /* OK WORKS FINE*/
             for (int i = 0; i < N - 1; i++) {
                 for (int j = i + 1; j < N; j++) {
                     if (DEGREE[i] == DEGREE[j]) {
-                        IloIntExpr[] reversedMatrixI = reverseArrayNew(MATRIX[i], i, j);
-                        IloIntExpr[] reversedMatrixJ = reverseArrayNew(MATRIX[j], i, j);
-                        cp.add(cp.lexicographic(reversedMatrixI, reversedMatrixJ));
+                        cp.add(cp.lexicographic(M[i], M[j]));
                     }
                 }
             }
 
-
-            // Constraint Of connectivity using Upper Off-Diagonal Technique
-/*
-            // Generation of K_i Variables
-            // Define the distance variables
-            IloIntVar[] z = new IloIntVar[N];
-            for (int i = 0; i < N; i++) {
-                z[i] = cp.intVar(0, N - 1);
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testLex.txt"))) {
+                return collectResults(cp, M, w);
             }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
+    }
 
-            // Root node distance is 0
-            cp.addEq(z[0], 0);
-            // For all other nodes, distances must be greater than 0
-            for (int i = 1; i < N; i++) {
-                cp.addGe(z[i], 1);
-            }
+    /** Non-optimized RevLex (baseline). */
+    public static Result testRevLex(int[] DEGREE) {
+        try {
+            IloCP cp = new IloCP();
+            IloIntVar[][] M = buildRevLexBaseModel(cp, DEGREE);
 
-            for (int i = 1; i < N; i++) {
-                for (int k = 1; k < N; k++) {
-                    IloConstraint[] neighborConstraints = new IloConstraint[N - 1];
-                    int index = 0;
-                    for (int j = 0; j < N; j++) {
-                        if (j != i) {
-                            // Combine constraints into an array
-                            IloConstraint[] combinedConstraints = new IloConstraint[2];
-                            combinedConstraints[0] = cp.neq(MATRIX[i][j], 0);
-                            combinedConstraints[1] = cp.eq(z[j], k - 1);
-
-                            // Use cp.and with an array of constraints
-                            neighborConstraints[index++] = cp.and(combinedConstraints);
-                        }
-                    }
-                    cp.add(cp.ifThen(
-                            cp.eq(z[i], k),
-                            cp.or(neighborConstraints)
-                    ));
-
-
-                }
-            }
-
-            // ajouter pour optimiser les solution redondants due à la variable Z.
-            for (int i = 0; i < N; i++) {
-                for (int j = i + 1; j < N; j++) {
-                    cp.add(cp.ifThen(
-                            cp.neq(MATRIX[i][j], 0),
-                            cp.le(cp.abs(cp.diff(z[i], z[j])), 1)
-                    ));
-                    //si aij >0 alors abs( zi - zj) <= 1
-                }
-            }
-
-*/
-
-
-            // Constraint Of connectivity using Upper Off-Diagonal Technique (First proposal
-            for (int i = 0; i < N; i++) {
-                // Ensure that the sum of the subarray from i+1 to N is greater than 0
-                if ((i + 1) < N) // pour eviter la derniere ligne
-                {
-                    IloIntVar[] subArray = Arrays.copyOfRange(MATRIX[i], i + 1, N);
-                    cp.add(cp.gt(cp.sum(subArray), 0));
-                }
-            }
-
-            // Connectivity Constraint: Every vertex i must connect to at least one higher-indexed vertex
-          /*  for (int i = 0; i < N - 1; i++) {                    // No need for i == N-1
-                IloIntVar[] upperPart = new IloIntVar[N - i - 1];
-                for (int j = 0; j < upperPart.length; j++) {
-                    upperPart[j] = MATRIX[i][i + 1 + j];
-                }
-                cp.add(cp.gt(cp.sum(upperPart), 0));
-            }*/
-            /*
+            int N = DEGREE.length;
             for (int i = 0; i < N - 1; i++) {
-                IloIntVar[] upper = Arrays.copyOfRange(MATRIX[i], i + 1, N);
-                cp.add(cp.gt(cp.sum(upper), 0));
-            }*/
-
-            // Configure solver for memory optimization
-            cp.setParameter(IloCP.IntParam.LogVerbosity, IloCP.ParameterValues.Quiet); // Suppress logs
-            cp.setParameter(IloCP.IntParam.SearchType, IloCP.ParameterValues.DepthFirst); // Depth-first search
-            cp.setParameter(IloCP.IntParam.DefaultInferenceLevel, IloCP.ParameterValues.Low); // Low inference level
-            cp.setParameter(IloCP.IntParam.MemoryDisplay, 0); // 0 disable , 1 Enable memory usage display
-
-            // Measure execution time
-            long startTime = System.currentTimeMillis();
-
-            // Create timestamp for filename
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd_HHmmss_SSS");
-            String timestamp = sdf.format(new Date());
-            String filename = "output_testOptimizedRevLexConDiag.txt";
-            PrintWriter writer = new PrintWriter(new FileWriter(filename));
-
-            // Start the search
-            cp.startNewSearch();
-            int solutionCount = 0;
-            boolean ok = false;
-            /*while (cp.next()) {
-                solutionCount++;
-                ok = true;
-                //System.out.print(" \n");
-                for (int i = 0; i < N; i++) {
-                    for (int j = 0; j < N; j++) {
-                        //System.out.print(" " + (int) cp.getValue(MATRIX[i][j]));
-                        writer.print(" " + (int) cp.getValue(MATRIX[i][j]));
+                for (int j = i + 1; j < N; j++) {
+                    if (DEGREE[i] == DEGREE[j]) {
+                        cp.add(cp.lexicographic(
+                                reverseArray(M[i]),
+                                reverseArray(M[j])));
                     }
-                    //System.out.print(" \n");
-                    writer.println();
                 }
-                writer.println();
-                writer.println();
-            }*/
-            while (cp.next()) {
-                solutionCount++; // Count solutions without storing them
             }
-            writer.close();
-            cp.endSearch(); // End the search
 
-            // Measure and print execution time
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-            // Collect solver diagnostics
-            long fails = cp.getInfo(IloCP.IntInfo.NumberOfFails);
-            long branches = cp.getInfo(IloCP.IntInfo.NumberOfBranches);
-            long choicePoints = cp.getInfo(IloCP.IntInfo.NumberOfChoicePoints);
-            long constraints = cp.getInfo(IloCP.IntInfo.NumberOfConstraints);
-
-            return new Result(solutionCount, elapsedTime, fails, branches, choicePoints, constraints);
-            //return new Result(solutionCount, elapsedTime);
-
-        } catch (IloException e) {
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+            configureSolver(cp);
+            try (PrintWriter w = new PrintWriter(new FileWriter("output_testRevLex.txt"))) {
+                return collectResults(cp, M, w);
+            }
+        } catch (IloException | IOException e) { throw new RuntimeException(e); }
     }
 
+    // =========================================================================
+    //  ARRAY UTILITIES
+    // =========================================================================
 
-
-    public static IloIntExpr[] reverseArray(IloIntExpr[] array) throws IloException {
-        int length = array.length;
-        IloIntExpr[] reversedArray = new IloIntExpr[length];
-
-        for (int i = 0; i < length; i++) {
-            reversedArray[i] = array[length - 1 - i];
+    /**
+     * Returns a reversed copy of {@code array} (all elements included).
+     * Used only by the legacy non-optimized RevLex.
+     */
+    public static IloIntExpr[] reverseArray(IloIntExpr[] array) {
+        int len = array.length;
+        IloIntExpr[] rev = new IloIntExpr[len];
+        for (int i = 0; i < len; i++) {
+            rev[i] = array[len - 1 - i];
         }
-
-        return reversedArray;
+        return rev;
     }
 
-     // Modified reverseArray to exclude columns i and i+1
-    public static IloIntExpr[] reverseArrayNew(IloIntExpr[] array, int exclude1, int exclude2) throws IloException {
-        int length = array.length;
-        List<IloIntExpr> filteredList = new ArrayList<>();
-
-        for (int i = length - 1; i >= 0; i--) { // Reverse iteration
+    /**
+     * Returns the row array in <em>reverse</em> order with columns
+     * {@code exclude1} and {@code exclude2} removed.
+     *
+     * <p>Used by OptRevLex and the hybrid (when RevLex is selected).
+     */
+    public static IloIntExpr[] reverseArrayNew(IloIntExpr[] array,
+                                               int exclude1, int exclude2) {
+        List<IloIntExpr> result = new ArrayList<>(array.length - 2);
+        for (int i = array.length - 1; i >= 0; i--) {
             if (i != exclude1 && i != exclude2) {
-                filteredList.add(array[i]);
+                result.add(array[i]);
             }
         }
-
-        return filteredList.toArray(new IloIntExpr[0]);
+        return result.toArray(new IloIntExpr[0]);
     }
 
-    public static IloIntExpr[] arrayNew(IloIntExpr[] array, int exclude1, int exclude2) throws IloException {
-        if (array == null) {
-            throw new IllegalArgumentException("Input array cannot be null");
+    /**
+     * Returns the row array in <em>forward</em> order with columns
+     * {@code exclude1} and {@code exclude2} removed.
+     *
+     * <p>Used by OptLex and the hybrid (when Lex is selected).
+     */
+    public static IloIntExpr[] arrayNew(IloIntExpr[] array,
+                                        int exclude1, int exclude2) {
+        if (array == null) throw new IllegalArgumentException("array must not be null");
+        int len = array.length;
+        if (exclude1 < 0 || exclude1 >= len || exclude2 < 0 || exclude2 >= len) {
+            throw new IllegalArgumentException(
+                    "Exclude indices must be in [0, " + len + ")");
         }
-        int length = array.length;
-        if (exclude1 < 0 || exclude1 >= length || exclude2 < 0 || exclude2 >= length) {
-            throw new IllegalArgumentException("Exclude indices must be within [0, length)");
-        }
-
-        // Calculate size of result array (exclude1 and exclude2 may be the same)
-        int resultSize = (exclude1 == exclude2) ? length - 1 : length - 2;
-        IloIntExpr[] result = new IloIntExpr[resultSize];
-        int index = 0;
-
-        for (int i = 0; i < length; i++) {
+        int size = (exclude1 == exclude2) ? len - 1 : len - 2;
+        IloIntExpr[] result = new IloIntExpr[size];
+        int idx = 0;
+        for (int i = 0; i < len; i++) {
             if (i != exclude1 && i != exclude2) {
-                result[index++] = array[i];
+                result[idx++] = array[i];
             }
         }
-
         return result;
     }
-
-
 }

@@ -42,23 +42,23 @@ public class MAIN_Valid_before_17MAI2026 {
     public static void runExperimentsHybrid() throws IOException {
 
         for (TestCase sample : DataExperForPaperLexVsRevLex.GraphSamples) {
-            Result Lex = OpLexVsOpRevLexVsHybrid.testLex(sample.degrees);
-            Result RevLex = OpLexVsOpRevLexVsHybrid.testRevLex(sample.degrees); // or CoLex
-            Result AntiLex = OpLexVsOpRevLexVsHybrid.testAntiLex(sample.degrees);
-            Result Snake = OpLexVsOpRevLexVsHybrid.testSnake(sample.degrees);
-            Result optLex = OpLexVsOpRevLexVsHybrid.testOptimizedLex(sample.degrees);
-            Result optRevLex = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(sample.degrees);
-            Result optLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedLexWithCanocialChecker(sample.degrees);
-            Result optAntiLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedAntiLexWithCanocialChecker(sample.degrees);
-            Result optRevLexWithCC = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexWithCanocialChecker(sample.degrees);
-            Result optLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(sample.degrees);
-            Result optRevLexCon = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(sample.degrees);
-            Result optRevLexConDiagRev = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(sample.degrees);
+            Result Lex = OpLexVsOpRevLexVsHybrid_ba.testLex(sample.degrees);
+            Result RevLex = OpLexVsOpRevLexVsHybrid_ba.testRevLex(sample.degrees); // or CoLex
+            Result AntiLex = OpLexVsOpRevLexVsHybrid_ba.testAntiLex(sample.degrees);
+            Result Snake = OpLexVsOpRevLexVsHybrid_ba.testSnake(sample.degrees);
+            Result optLex = OpLexVsOpRevLexVsHybrid_ba.testOptimizedLex(sample.degrees);
+            Result optRevLex = OpLexVsOpRevLexVsHybrid_ba.testOptimizedRevLex(sample.degrees);
+            Result optLexWithCC = OpLexVsOpRevLexVsHybrid_ba.testOptimizedLexWithCanocialChecker(sample.degrees);
+            Result optAntiLexWithCC = OpLexVsOpRevLexVsHybrid_ba.testOptimizedAntiLexWithCanocialChecker(sample.degrees);
+            Result optRevLexWithCC = OpLexVsOpRevLexVsHybrid_ba.testOptimizedRevLexWithCanocialChecker(sample.degrees);
+            Result optLexCon = OpLexVsOpRevLexVsHybrid_ba.testOptimizedLexCon(sample.degrees);
+            Result optRevLexCon = OpLexVsOpRevLexVsHybrid_ba.testOptimizedRevLexCon(sample.degrees);
+            Result optRevLexConDiagRev = OpLexVsOpRevLexVsHybrid_ba.testOptimizedRevLexConDiag(sample.degrees);
 
 
-            //Result optLexCon =   OpLexVsOpRevLexVsHybrid.testOptimizedLexConKKtree(sample.degrees);
+            //Result optLexCon =   OpLexVsOpRevLexVsHybrid_ba.testOptimizedLexConKKtree(sample.degrees);
             System.out.println("***********\n");
-            //Result optRevLexCon =    OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConKKtree(sample.degrees);;
+            //Result optRevLexCon =    OpLexVsOpRevLexVsHybrid_ba.testOptimizedRevLexConKKtree(sample.degrees);;
 
             // Analyze isomorphism rates for each output file
             IsomorphismData isoLex = analyzeIsomorphism("output_testLex.txt");

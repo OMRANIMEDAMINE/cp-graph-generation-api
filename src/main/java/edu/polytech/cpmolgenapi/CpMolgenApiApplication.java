@@ -8,41 +8,68 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Main entry point for the graph generation experiments.
+ * Main entry point for the graph-generation experiments.
  *
- * Paper: "RevLex Ordering and Upper Off-Diagonal Connectivity Constraints:
- *         A Synergistic Approach for Connected Non-Isomorphic Graph Enumeration"
+ * <p>Paper: "RevLex Ordering and Upper Off-Diagonal Connectivity Constraints:
+ * A Synergistic Approach for Connected Non-Isomorphic Graph Enumeration"
  *
- * Produces a formatted multi-metric comparison table with the 5 paper columns:
+ * <p>Produces a single unified comparison table with 7 columns in two groups:
  *
- *   Instance | Lex | RevLex | Lex (P) | RevLex (P) | RevLex (D)
+ * <pre>
+ * ── Group A: Symmetry breaking (all graphs) ──────────────────────────────────
+ *   OptLex | OptRevLex | Hybrid
  *
- * Each column reports per instance:
- *   - Solutions found  + CPU time (seconds)
- *   - Fails            (backtracks)
- *   - Branches         (branches explored)
- *   - Choice points
+ * ── Group B: Connectivity (connected graphs only) ────────────────────────────
+ *   OptLex(P) | OptRevLex(P) | Hybrid(P) | OptRevLex(D)
+ * </pre>
+ *
+ * <p>Each cell reports two sub-rows per instance:
+ * <pre>
+ *   Row 1: solutions found  +  CPU time (seconds)
+ *   Row 2: failures / branches / choice-points
+ * </pre>
+ *
+ * <p><b>Hybrid switching rule</b>
+ * ({@link OpLexVsOpRevLexVsHybrid#useRevLex(int, int)}):
+ * <pre>
+ *   RevLex  when  2d &lt; n,  or  (2d == n AND d even)
+ *   Lex     otherwise
+ * </pre>
+ * On the current benchmark this selects OptRevLex for every instance except
+ * K₆(3) (2d = n = 6, odd d → OptLex).  The selected ordering is shown in the
+ * Hybrid column header per group.
+ *
+ * <p><b>Why no Hybrid(D)?</b>
+ * The upper off-diagonal encoding (Theorem 2) is only valid under OptRevLex.
+ * When the hybrid selects OptLex the encoding is unsound (K₆(3) → 0 solutions
+ * empirically).  Hybrid connectivity therefore uses the path-based encoding,
+ * which is always valid.
  */
 @SpringBootApplication
 public class CpMolgenApiApplication {
 
     // =========================================================================
-    //  TABLE LAYOUT CONSTANTS
+    //  TABLE LAYOUT
     // =========================================================================
 
-    /** Column headers — match Table 1 of the paper exactly. */
-    private static final String[] COL_LABELS = {
-            "Lex", "RevLex", "Lex (P)", "RevLex (P)", "RevLex (D)"
+    /** Group A column headers — symmetry breaking, all graphs. */
+    private static final String[] GROUP_A_COLS = {
+            "OptLex", "OptRevLex", "Hybrid"
     };
 
-    /** Character width of the Instance column. */
-    private static final int W_INST = 13;
+    /** Group B column headers — connectivity, connected graphs. */
+    private static final String[] GROUP_B_COLS = {
+            "OptLex(P)", "OptRevLex(P)", "Hybrid(P)", "OptRevLex(D)"
+    };
 
-    /**
-     * Character width of each data column.
-     * Wide enough to fit e.g. "45,722 (11.75s)" comfortably.
-     */
-    private static final int W_COL = 20;
+    /** All 7 columns merged for the unified table. */
+    private static final String[] ALL_COLS = {
+            "OptLex", "OptRevLex", "Hybrid",
+            "OptLex(P)", "OptRevLex(P)", "Hybrid(P)", "OptRevLex(D)"
+    };
+
+    private static final int W_INST = 13;
+    private static final int W_COL  = 20;
 
     // =========================================================================
     //  ENTRY POINT
@@ -54,32 +81,20 @@ public class CpMolgenApiApplication {
     }
 
     // =========================================================================
-    //  PAPER EXPERIMENTS
+    //  EXPERIMENT RUNNER
     // =========================================================================
 
-    /**
-     * Runs all 5 paper configurations on every benchmark instance and
-     * prints a formatted multi-metric table to stdout.
-     *
-     * Configurations:
-     *   Lex          → testOptimizedLex           (all graphs)
-     *   RevLex       → testOptimizedRevLex        (all graphs)
-     *   Lex (P)      → testOptimizedLexCon        (connected, path-based)
-     *   RevLex (P)   → testOptimizedRevLexCon     (connected, path-based)
-     *   RevLex (D)   → testOptimizedRevLexConDiag (connected, off-diagonal)
-     */
     public static void runPaperExperiments() throws IOException {
 
-        // ---- banner ----
         printBanner();
 
-        // ---- build instance lookup ----
+        // Build instance lookup
         Map<String, TestCase> lookup = new LinkedHashMap<>();
         for (TestCase tc : PaperBenchmarkData.GRAPH_SAMPLES) {
             lookup.put(tc.name, tc);
         }
 
-        // ---- degree-family groups (mirrors paper table row groupings) ----
+        // Degree-family groups — mirror paper table row groupings
         String[][] groups = {
                 { "2-Regular Graphs  K_n(2)",
                         "K5_2", "K6_2", "K8_2", "K10_2", "K12_2", "K14_2", "K16_2" },
@@ -90,13 +105,6 @@ public class CpMolgenApiApplication {
                 { "5-Regular Graphs  K_n(5)",
                         "K12_5" }
         };
-       /* String[][] groups = {
-
-                { "3-Regular Graphs  K_n(3)  [cubic]",
-                          "K14_3" },
-                { "5-Regular Graphs  K_n(5)",
-                        "K12_5" }
-        };*/
 
         for (String[] group : groups) {
             System.out.println();
@@ -108,17 +116,26 @@ public class CpMolgenApiApplication {
                 TestCase tc = lookup.get(group[i]);
                 if (tc == null) continue;
 
-                // ---- run the 5 configurations ----
-                Result rLex     = OpLexVsOpRevLexVsHybrid.testOptimizedLex(tc.degrees);
-                Result rRevLex  = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(tc.degrees);
-                Result rLexP    = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(tc.degrees);
-                Result rRevLexP = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(tc.degrees);
-                Result rRevLexD = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(tc.degrees);
+                // ---- Group A: symmetry breaking (all graphs) ----
+                Result rLex      = OpLexVsOpRevLexVsHybrid.testOptimizedLex(tc.degrees);
+                Result rRevLex   = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(tc.degrees);
+                Result rHybrid   = OpLexVsOpRevLexVsHybrid.testHybridLexRevLex(tc.degrees);
 
-                Result[] cols = { rLex, rRevLex, rLexP, rRevLexP, rRevLexD };
+                // ---- Group B: connectivity (connected graphs) ----
+                Result rLexP     = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(tc.degrees);
+                Result rRevLexP  = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(tc.degrees);
+                Result rHybridP  = OpLexVsOpRevLexVsHybrid.testHybridLexRevLexCon(tc.degrees);
+                Result rRevLexD  = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(tc.degrees);
 
-                // ---- print the 4 metric sub-rows for this instance ----
-                printInstanceRows(tc.name, cols);
+                // Annotate instance name with hybrid ordering decision
+                int d = tc.degrees[0];
+                int n = tc.degrees.length;
+                String tag = OpLexVsOpRevLexVsHybrid.useRevLex(d, n) ? "[RL]" : "[L] ";
+                String label = tc.name + tag;
+
+                printInstanceRows(label,
+                        new Result[]{ rLex, rRevLex, rHybrid,
+                                rLexP, rRevLexP, rHybridP, rRevLexD });
                 printHRule('-');
             }
         }
@@ -127,122 +144,109 @@ public class CpMolgenApiApplication {
     }
 
     // =========================================================================
-    //  TABLE PRINTING — STRUCTURE
+    //  TABLE PRINTING
     // =========================================================================
 
     private static void printBanner() {
         int w = tableWidth();
         System.out.println();
         System.out.println("=".repeat(w));
-        System.out.println(center("d-Regular Graph Generation — Paper Benchmark", w));
+        System.out.println(center("d-Regular Graph Generation — Benchmark", w));
         System.out.println(center(
-                "RevLex + Upper Off-Diagonal Connectivity Constraints", w));
+                "Lex / RevLex / Hybrid  ×  Symmetry-breaking & Connectivity", w));
         System.out.println("=".repeat(w));
         System.out.println();
-        System.out.println("Metrics per cell:");
-        System.out.printf("  %-14s %s%n", "Sol (Time)",
-                "Solutions found  +  CPU time in seconds");
-        System.out.printf("  %-14s %s%n", "Fails",
-                "Number of failures / backtracks");
-        System.out.printf("  %-14s %s%n", "Branches",
-                "Number of branches explored in the search tree");
-        System.out.printf("  %-14s %s%n", "Choices",
-                "Number of choice points");
-        System.out.printf("  %-14s %s%n", "(>300)",
-                "Instance exceeded the 300-second time limit");
-        System.out.printf("  %-14s %s%n", "--",
-                "Metric not collected by the solver");
+        System.out.println("Instance tag:  [RL] = Hybrid selects OptRevLex,  [L] = Hybrid selects OptLex");
+        System.out.println("Metrics:  Row 1 = Sol (CPU time s)   |   Row 2 = Failures/Branches/ChoicePoints");
+        System.out.println("(>300s) = time-limit exceeded   |   -- = not collected");
+        System.out.println();
+        System.out.println("  Group A ── Symmetry breaking (all graphs) ──────────────────────────────");
+        System.out.println("    OptLex      : OptLex ordering (Codish 2018)");
+        System.out.println("    OptRevLex   : OptRevLex ordering (this paper)");
+        System.out.println("    Hybrid      : per-instance OptRevLex or OptLex based on (d,n)");
+        System.out.println();
+        System.out.println("  Group B ── Connectivity (connected graphs only) ─────────────────────────");
+        System.out.println("    OptLex(P)   : OptLex   + path-based connectivity");
+        System.out.println("    OptRevLex(P): OptRevLex + path-based connectivity");
+        System.out.println("    Hybrid(P)   : Hybrid   + path-based connectivity  [always valid]");
+        System.out.println("    OptRevLex(D): OptRevLex + upper off-diagonal encoding (Theorem 2, O(n))");
+        System.out.println("    [No Hybrid(D): off-diagonal is unsound when Hybrid→OptLex]");
         System.out.println();
     }
 
     private static void printGroupHeader(String title) {
-        System.out.println("  [ " + title + " ]");
+        System.out.println("  ─── " + title + " ───");
     }
 
     /**
-     * Prints the two-line column header:
-     *
-     *   | Instance     | Lex                | RevLex             | ...
-     *   | Metric       | Sol(s) Fail Br Ch  | Sol(s) Fail Br Ch  | ...
+     * Three-line column header:
+     * <pre>
+     *  Line 1: group labels spanning their sub-columns
+     *  Line 2: individual column names
+     *  Line 3: metric sub-label
+     * </pre>
      */
     private static void printColumnHeader() {
-        // Row 1 — column labels
+        int wA = GROUP_A_COLS.length * (W_COL + 1) - 1;   // width of group A span
+        int wB = GROUP_B_COLS.length * (W_COL + 1) - 1;   // width of group B span
+
+        // Line 1 — group span labels
+        StringBuilder g = new StringBuilder("|");
+        g.append(pad("Instance", W_INST)).append("|");
+        g.append(center("── Group A: Symmetry breaking ──", wA)).append("|");
+        g.append(center("────────── Group B: Connectivity ──────────", wB)).append("|");
+        System.out.println(g);
+
+        // Line 2 — column names
         StringBuilder r1 = new StringBuilder("|");
-        r1.append(pad("Instance", W_INST)).append("|");
-        for (String lbl : COL_LABELS) {
+        r1.append(pad("", W_INST)).append("|");
+        for (String lbl : ALL_COLS) {
             r1.append(center(lbl, W_COL)).append("|");
         }
         System.out.println(r1);
 
-        // Row 2 — metric sub-label row
+        // Line 3 — metric sub-label
         StringBuilder r2 = new StringBuilder("|");
         r2.append(pad("", W_INST)).append("|");
-        for (int i = 0; i < COL_LABELS.length; i++) {
-            r2.append(center("Sol (Time) / Metrics", W_COL)).append("|");
+        for (String ignored : ALL_COLS) {
+            r2.append(center("Sol(s) | f/br/ch", W_COL)).append("|");
         }
         System.out.println(r2);
     }
 
-    /**
-     * Prints one horizontal rule using the given character.
-     *
-     * @param ch '-' for a thin rule, '=' for a thick rule
-     */
     private static void printHRule(char ch) {
         String seg = String.valueOf(ch).repeat(W_COL);
         StringBuilder sb = new StringBuilder("+");
         sb.append(String.valueOf(ch).repeat(W_INST)).append("+");
-        for (int i = 0; i < COL_LABELS.length; i++) {
+        for (String ignored : ALL_COLS) {
             sb.append(seg).append("+");
         }
         System.out.println(sb);
     }
 
     /**
-     * Prints an instance block as four sub-rows:
-     *
-     *   | K10_2        |  9 (0.01s)         |  16 (0.01s)        | ...
-     *   |  Fails       |  0                 |  2                 | ...
-     *   |  Branches    |  24                |  31                | ...
-     *   |  Choices     |  12                |  18                | ...
+     * Prints two sub-rows per instance across all 7 columns.
+     * <pre>
+     *   Row 1: instance name | sol (time) × 7
+     *   Row 2: "  f/br/ch"  | f/br/ch    × 7
+     * </pre>
      */
     private static void printInstanceRows(String name, Result[] cols) {
-
-        // Sub-row 0 — Solutions + Time  (instance name in first column)
-        printSubRow(name, cols, SubMetric.SOL_TIME);
-
-        // Sub-row 1 — Fails
-        printSubRow("  Fails",    cols, SubMetric.FAILS);
-
-        // Sub-row 2 — Branches
-        printSubRow("  Branches", cols, SubMetric.BRANCHES);
-
-        // Sub-row 3 — Choice Points
-        printSubRow("  Choices",  cols, SubMetric.CHOICES);
-    }
-
-    /** The four metrics displayed per cell. */
-    private enum SubMetric { SOL_TIME, FAILS, BRANCHES, CHOICES }
-
-    private static void printSubRow(String rowLabel, Result[] cols, SubMetric m) {
-        StringBuilder sb = new StringBuilder("|");
-        sb.append(pad(rowLabel, W_INST)).append("|");
+        // Row 1: Solutions + Time
+        StringBuilder r1 = new StringBuilder("|");
+        r1.append(pad(name, W_INST)).append("|");
         for (Result r : cols) {
-            String cell = (r == null) ? "--" : cellValue(r, m);
-            sb.append(center(cell, W_COL)).append("|");
+            r1.append(center(r == null ? "--" : solTime(r), W_COL)).append("|");
         }
-        System.out.println(sb);
-    }
+        System.out.println(r1);
 
-    /** Extracts the formatted string for a given metric from a result. */
-    private static String cellValue(Result r, SubMetric m) {
-        switch (m) {
-            case SOL_TIME: return solTime(r);
-            case FAILS:    return metric(r.fails);
-            case BRANCHES: return metric(r.branches);
-            case CHOICES:  return metric(r.choicePoints);
-            default:       return "--";
+        // Row 2: f / br / ch
+        StringBuilder r2 = new StringBuilder("|");
+        r2.append(pad("  f/br/ch", W_INST)).append("|");
+        for (Result r : cols) {
+            r2.append(center(r == null ? "--" : fbch(r), W_COL)).append("|");
         }
+        System.out.println(r2);
     }
 
     private static void printFooter() {
@@ -258,56 +262,44 @@ public class CpMolgenApiApplication {
     //  VALUE FORMATTERS
     // =========================================================================
 
-    /**
-     * Formats the primary cell content: solution count + CPU time.
-     * Shows "(>300)" when the time limit was exceeded.
-     */
     private static String solTime(Result r) {
-        if (r == null) return "--";
         String t = (r.cpu >= 300_000)
-                ? "(>300)"
+                ? "(>300s)"
                 : String.format("%.2fs", r.cpu / 1000.0);
         return String.format("%,d (%s)", r.count, t);
     }
 
-    /**
-     * Formats a long solver metric with compact notation for large values:
-     *   -1        → "--"   (metric not collected)
-     *   ≥ 1 000 000 → "X.XXM"
-     *   ≥ 1 000     → "X,XXX"
-     *   otherwise   → plain integer
-     */
+    private static String fbch(Result r) {
+        return metric(r.fails) + "/" + metric(r.branches) + "/" + metric(r.choicePoints);
+    }
+
     private static String metric(long v) {
-        if (v < 0)            return "--";
-        if (v >= 1_000_000L)  return String.format("%.2fM", v / 1_000_000.0);
-        if (v >= 1_000L)      return String.format("%,d", v);
+        if (v < 0)           return "--";
+        if (v >= 1_000_000L) return String.format("%.1fM", v / 1_000_000.0);
+        if (v >= 1_000L)     return String.format("%.1fK", v / 1_000.0);
         return Long.toString(v);
     }
 
     // =========================================================================
-    //  STRING / LAYOUT HELPERS
+    //  LAYOUT HELPERS
     // =========================================================================
 
-    /** Left-pads {@code s} to exactly {@code width} characters (1 space margin). */
     private static String pad(String s, int width) {
         String cell = " " + s;
         if (cell.length() >= width) return cell.substring(0, width);
         return cell + " ".repeat(width - cell.length());
     }
 
-    /** Centers {@code s} in a field of {@code width} characters. */
     private static String center(String s, int width) {
         if (s == null) s = "";
         if (s.length() >= width) return s.substring(0, width);
-        int pad   = width - s.length();
-        int left  = pad / 2;
-        int right = pad - left;
+        int total = width - s.length();
+        int left  = total / 2;
+        int right = total - left;
         return " ".repeat(left) + s + " ".repeat(right);
     }
 
-    /** Total character width of the printed table. */
     private static int tableWidth() {
-        // | + W_INST + | + N * (W_COL + |)
-        return 1 + W_INST + 1 + COL_LABELS.length * (W_COL + 1);
+        return 1 + W_INST + 1 + ALL_COLS.length * (W_COL + 1);
     }
 }
