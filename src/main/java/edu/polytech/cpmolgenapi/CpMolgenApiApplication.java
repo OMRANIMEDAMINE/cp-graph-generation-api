@@ -13,14 +13,10 @@ import java.util.Map;
  * <p>Paper: "RevLex Ordering and Upper Off-Diagonal Connectivity Constraints:
  * A Synergistic Approach for Connected Non-Isomorphic Graph Enumeration"
  *
- * <p>Produces a single unified comparison table with 7 columns in two groups:
+ * <p>Produces a single unified comparison table with 5 columns:
  *
  * <pre>
- * ── Group A: Symmetry breaking (all graphs) ──────────────────────────────────
- *   OptLex | OptRevLex | Hybrid
- *
- * ── Group B: Connectivity (connected graphs only) ────────────────────────────
- *   OptLex(P) | OptRevLex(P) | Hybrid(P) | OptRevLex(D)
+ *   OptLex | OptRevLex | OptLex(P) | OptRevLex(P) | OptRevLex(D)
  * </pre>
  *
  * <p>Each cell reports two sub-rows per instance:
@@ -29,21 +25,15 @@ import java.util.Map;
  *   Row 2: failures / branches / choice-points
  * </pre>
  *
- * <p><b>Hybrid switching rule</b>
- * ({@link OpLexVsOpRevLexVsHybrid#useRevLex(int, int)}):
- * <pre>
- *   RevLex  when  2d &lt; n,  or  (2d == n AND d even)
- *   Lex     otherwise
- * </pre>
- * On the current benchmark this selects OptRevLex for every instance except
- * K₆(3) (2d = n = 6, odd d → OptLex).  The selected ordering is shown in the
- * Hybrid column header per group.
- *
- * <p><b>Why no Hybrid(D)?</b>
- * The upper off-diagonal encoding (Theorem 2) is only valid under OptRevLex.
- * When the hybrid selects OptLex the encoding is unsound (K₆(3) → 0 solutions
- * empirically).  Hybrid connectivity therefore uses the path-based encoding,
- * which is always valid.
+ * <p>Column semantics:
+ * <ul>
+ *   <li>OptLex        : OptLex ordering (Codish 2018), all graphs</li>
+ *   <li>OptRevLex     : OptRevLex ordering (this paper), all graphs</li>
+ *   <li>OptLex(P)     : OptLex   + path-based connectivity</li>
+ *   <li>OptRevLex(P)  : OptRevLex + path-based connectivity</li>
+ *   <li>OptRevLex(D)  : OptRevLex + upper off-diagonal encoding
+ *                       (Theorem 2, O(n)), connected graphs only</li>
+ * </ul>
  */
 @SpringBootApplication
 public class CpMolgenApiApplication {
@@ -52,23 +42,13 @@ public class CpMolgenApiApplication {
     //  TABLE LAYOUT
     // =========================================================================
 
-    /** Group A column headers — symmetry breaking, all graphs. */
-    private static final String[] GROUP_A_COLS = {
-            "OptLex", "OptRevLex", "Hybrid"
-    };
-
-    /** Group B column headers — connectivity, connected graphs. */
-    private static final String[] GROUP_B_COLS = {
-            "OptLex(P)", "OptRevLex(P)", "Hybrid(P)", "OptRevLex(D)"
-    };
-
-    /** All 7 columns merged for the unified table. */
+    /** All 5 columns of the unified table. */
     private static final String[] ALL_COLS = {
-            "OptLex", "OptRevLex", "Hybrid",
-            "OptLex(P)", "OptRevLex(P)", "Hybrid(P)", "OptRevLex(D)"
+            "OptLex", "OptRevLex",
+            "OptLex(P)", "OptRevLex(P)", "OptRevLex(D)"
     };
 
-    private static final int W_INST = 13;
+    private static final int W_INST = 10;
     private static final int W_COL  = 20;
 
     // =========================================================================
@@ -97,45 +77,38 @@ public class CpMolgenApiApplication {
         // Degree-family groups — mirror paper table row groupings
         String[][] groups = {
                 { "2-Regular Graphs  K_n(2)",
-                        "K5_2", "K6_2", "K8_2", "K10_2", "K12_2", "K14_2", "K16_2" },
-                { "3-Regular Graphs  K_n(3)  [cubic]",
+                        "K5_2", "K6_2", "K7_2", "K8_2",  "K9_2", "K10_2", "K11_2", "K12_2", "K13_2", "K14_2", "K15_2", "K16_2" },
+              /*  { "3-Regular Graphs  K_n(3)  [cubic]",
                         "K6_3", "K8_3", "K10_3", "K12_3", "K14_3" },
                 { "4-Regular Graphs  K_n(4)",
-                        "K8_4", "K9_4", "K10_4", "K11_4", "K12_4" },
+                        "K8_4", "K9_4", "K10_4", "K11_4", "K12_4" },*/
                 { "5-Regular Graphs  K_n(5)",
-                        "K12_5" }
+                        "K10_5","K12_5" },
+                { "6-Regular Graphs  K_n(6)",
+                        "K12_6" }
         };
 
+        printColumnHeader();
+        printHRule('=');
+
         for (String[] group : groups) {
-            System.out.println();
-            printGroupHeader(group[0]);
-            printColumnHeader();
-            printHRule('=');
+            printGroupLabel(group[0]);
 
             for (int i = 1; i < group.length; i++) {
                 TestCase tc = lookup.get(group[i]);
                 if (tc == null) continue;
 
-                // ---- Group A: symmetry breaking (all graphs) ----
-                Result rLex      = OpLexVsOpRevLexVsHybrid.testOptimizedLex(tc.degrees);
-                Result rRevLex   = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(tc.degrees);
-                Result rHybrid   = OpLexVsOpRevLexVsHybrid.testHybridLexRevLex(tc.degrees);
+                // ---- Symmetry breaking (all graphs) ----
+                Result rLex     = OpLexVsOpRevLexVsHybrid.testOptimizedLex(tc.degrees);
+                Result rRevLex  = OpLexVsOpRevLexVsHybrid.testOptimizedRevLex(tc.degrees);
 
-                // ---- Group B: connectivity (connected graphs) ----
-                Result rLexP     = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(tc.degrees);
-                Result rRevLexP  = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(tc.degrees);
-                Result rHybridP  = OpLexVsOpRevLexVsHybrid.testHybridLexRevLexCon(tc.degrees);
-                Result rRevLexD  = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(tc.degrees);
+                // ---- Connectivity (connected graphs only) ----
+                Result rLexP    = OpLexVsOpRevLexVsHybrid.testOptimizedLexCon(tc.degrees);
+                Result rRevLexP = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexCon(tc.degrees);
+                Result rRevLexD = OpLexVsOpRevLexVsHybrid.testOptimizedRevLexConDiag(tc.degrees);
 
-                // Annotate instance name with hybrid ordering decision
-                int d = tc.degrees[0];
-                int n = tc.degrees.length;
-                String tag = OpLexVsOpRevLexVsHybrid.useRevLex(d, n) ? "[RL]" : "[L] ";
-                String label = tc.name + tag;
-
-                printInstanceRows(label,
-                        new Result[]{ rLex, rRevLex, rHybrid,
-                                rLexP, rRevLexP, rHybridP, rRevLexD });
+                printInstanceRows(tc.name,
+                        new Result[]{ rLex, rRevLex, rLexP, rRevLexP, rRevLexD });
                 printHRule('-');
             }
         }
@@ -153,59 +126,43 @@ public class CpMolgenApiApplication {
         System.out.println("=".repeat(w));
         System.out.println(center("d-Regular Graph Generation — Benchmark", w));
         System.out.println(center(
-                "Lex / RevLex / Hybrid  ×  Symmetry-breaking & Connectivity", w));
+                "OptLex / OptRevLex  ×  Symmetry-breaking & Connectivity", w));
         System.out.println("=".repeat(w));
         System.out.println();
-        System.out.println("Instance tag:  [RL] = Hybrid selects OptRevLex,  [L] = Hybrid selects OptLex");
         System.out.println("Metrics:  Row 1 = Sol (CPU time s)   |   Row 2 = Failures/Branches/ChoicePoints");
-        System.out.println("(>300s) = time-limit exceeded   |   -- = not collected");
+        System.out.println("(>300s) = time-limit exceeded        |   -- = not collected");
         System.out.println();
-        System.out.println("  Group A ── Symmetry breaking (all graphs) ──────────────────────────────");
-        System.out.println("    OptLex      : OptLex ordering (Codish 2018)");
-        System.out.println("    OptRevLex   : OptRevLex ordering (this paper)");
-        System.out.println("    Hybrid      : per-instance OptRevLex or OptLex based on (d,n)");
-        System.out.println();
-        System.out.println("  Group B ── Connectivity (connected graphs only) ─────────────────────────");
-        System.out.println("    OptLex(P)   : OptLex   + path-based connectivity");
-        System.out.println("    OptRevLex(P): OptRevLex + path-based connectivity");
-        System.out.println("    Hybrid(P)   : Hybrid   + path-based connectivity  [always valid]");
-        System.out.println("    OptRevLex(D): OptRevLex + upper off-diagonal encoding (Theorem 2, O(n))");
-        System.out.println("    [No Hybrid(D): off-diagonal is unsound when Hybrid→OptLex]");
+        System.out.println("  Columns:");
+        System.out.println("    OptLex        : OptLex ordering (Codish 2018), all graphs");
+        System.out.println("    OptRevLex     : OptRevLex ordering (this paper), all graphs");
+        System.out.println("    OptLex(P)     : OptLex   + path-based connectivity");
+        System.out.println("    OptRevLex(P)  : OptRevLex + path-based connectivity");
+        System.out.println("    OptRevLex(D)  : OptRevLex + upper off-diagonal encoding (Theorem 2, O(n))");
         System.out.println();
     }
 
-    private static void printGroupHeader(String title) {
+    private static void printGroupLabel(String title) {
+        System.out.println();
         System.out.println("  ─── " + title + " ───");
     }
 
     /**
-     * Three-line column header:
+     * Two-line column header:
      * <pre>
-     *  Line 1: group labels spanning their sub-columns
-     *  Line 2: individual column names
-     *  Line 3: metric sub-label
+     *   Line 1: individual column names
+     *   Line 2: metric sub-label
      * </pre>
      */
     private static void printColumnHeader() {
-        int wA = GROUP_A_COLS.length * (W_COL + 1) - 1;   // width of group A span
-        int wB = GROUP_B_COLS.length * (W_COL + 1) - 1;   // width of group B span
-
-        // Line 1 — group span labels
-        StringBuilder g = new StringBuilder("|");
-        g.append(pad("Instance", W_INST)).append("|");
-        g.append(center("── Group A: Symmetry breaking ──", wA)).append("|");
-        g.append(center("────────── Group B: Connectivity ──────────", wB)).append("|");
-        System.out.println(g);
-
-        // Line 2 — column names
+        // Line 1 — column names
         StringBuilder r1 = new StringBuilder("|");
-        r1.append(pad("", W_INST)).append("|");
+        r1.append(pad("Instance", W_INST)).append("|");
         for (String lbl : ALL_COLS) {
             r1.append(center(lbl, W_COL)).append("|");
         }
         System.out.println(r1);
 
-        // Line 3 — metric sub-label
+        // Line 2 — metric sub-label
         StringBuilder r2 = new StringBuilder("|");
         r2.append(pad("", W_INST)).append("|");
         for (String ignored : ALL_COLS) {
@@ -225,10 +182,10 @@ public class CpMolgenApiApplication {
     }
 
     /**
-     * Prints two sub-rows per instance across all 7 columns.
+     * Prints two sub-rows per instance across all 5 columns.
      * <pre>
-     *   Row 1: instance name | sol (time) × 7
-     *   Row 2: "  f/br/ch"  | f/br/ch    × 7
+     *   Row 1: instance name | sol (time) × 5
+     *   Row 2: "  f/br/ch"  | f/br/ch    × 5
      * </pre>
      */
     private static void printInstanceRows(String name, Result[] cols) {

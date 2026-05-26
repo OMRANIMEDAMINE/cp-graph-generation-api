@@ -32,21 +32,41 @@ public class PaperBenchmarkData {
                     new int[]{2, 2, 2, 2, 2, 2},
                     "K_6(2): 2-regular on 6 vertices"),
 
+            new TestCase("K7_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2 },
+                    "K_7(2): 2-regular on 7 vertices"),
+
             new TestCase("K8_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2},
                     "K_8(2): 2-regular on 8 vertices"),
+
+            new TestCase("K9_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2},
+                    "K_9(2): 2-regular on 9 vertices"),
 
             new TestCase("K10_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
                     "K_10(2): 2-regular on 10 vertices"),
 
+            new TestCase("K11_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+                    "K_11(2): 2-regular on 11 vertices"),
+
             new TestCase("K12_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
                     "K_12(2): 2-regular on 12 vertices"),
 
+            new TestCase("K13_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+                    "K_13(2): 2-regular on 13 vertices"),
+
             new TestCase("K14_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
                     "K_14(2): 2-regular on 14 vertices"),
+
+            new TestCase("K15_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+                    "K_15(2): 2-regular on 15 vertices"),
 
             new TestCase("K16_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
@@ -103,8 +123,22 @@ public class PaperBenchmarkData {
             // d = 5  —  5-regular graphs
             // Note: 5-regular requires n even.
             // =====================================================================
-            new TestCase("K12_5",
+            new TestCase("K10_5",
                     new int[]{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5},
+                    "K_10(5): 5-regular on 10 vertices"),
+            new TestCase("K12_5",
+                    new int[]{5, 5, 5, 5, 5, 5, 5, 5, 5, 5},
                     "K_12(5): 5-regular on 12 vertices"),
+
+
+            // =====================================================================
+            // d = 6  —  6-regular graphs
+            // Note: 6-regular requires n even.
+            // =====================================================================
+            new TestCase("K12_6",
+                    new int[]{6,6,6,6,6,6,6,6,6,6,6,6},
+                    "K_12(5): 5-regular on 12 vertices"),
+
+
     };
 }
