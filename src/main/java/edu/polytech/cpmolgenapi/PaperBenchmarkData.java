@@ -99,6 +99,10 @@ public class PaperBenchmarkData {
             // =====================================================================
             // d = 4  —  4-regular graphs
             // =====================================================================
+            new TestCase("K7_4",
+                    new int[]{4, 4, 4, 4, 4, 4, 4},
+
+                    "K_8(4): 4-regular on 8 vertices  [hybrid boundary: 2d==n, d even → RevLex]"),
             new TestCase("K8_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4},
                     "K_8(4): 4-regular on 8 vertices  [hybrid boundary: 2d==n, d even → RevLex]"),
@@ -123,11 +127,20 @@ public class PaperBenchmarkData {
             // d = 5  —  5-regular graphs
             // Note: 5-regular requires n even.
             // =====================================================================
+            new TestCase("K6_5",
+                    new int[]{5, 5, 5, 5, 5, 5},
+                    "K_6(5): 5-regular on 6 vertices"),
+
+            new TestCase("K8_5",
+                    new int[]{5, 5, 5, 5, 5, 5, 5, 5},
+                    "K_8(5): 5-regular on 8 vertices"),
+
             new TestCase("K10_5",
-                    new int[]{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5},
-                    "K_10(5): 5-regular on 10 vertices"),
-            new TestCase("K12_5",
                     new int[]{5, 5, 5, 5, 5, 5, 5, 5, 5, 5},
+                    "K_10(5): 5-regular on 10 vertices"),
+
+            new TestCase("K12_5",
+                    new int[]{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5},
                     "K_12(5): 5-regular on 12 vertices"),
 
 
@@ -135,9 +148,48 @@ public class PaperBenchmarkData {
             // d = 6  —  6-regular graphs
             // Note: 6-regular requires n even.
             // =====================================================================
+            new TestCase("K7_6",
+                    new int[]{6,6,6,6,6,6,6},
+                    "K_7(6): 6-regular on 7 vertices"),
+            new TestCase("K8_6",
+                    new int[]{6,6,6,6,6,6,6,6},
+                    "K_8(6): 6-regular on 8 vertices"),
+            new TestCase("K9_6",
+                    new int[]{6,6,6,6,6,6,6,6,6},
+                    "K_9(6): 6-regular on 9 vertices"),
+            new TestCase("K10_6",
+                    new int[]{6,6,6,6,6,6,6,6,6,6},
+                    "K_10(6): 6-regular on 10 vertices"),
+            new TestCase("K11_6",
+                    new int[]{6,6,6,6,6,6,6,6,6,6,6},
+                    "K_11(6): 6-regular on 11 vertices"),
             new TestCase("K12_6",
                     new int[]{6,6,6,6,6,6,6,6,6,6,6,6},
-                    "K_12(5): 5-regular on 12 vertices"),
+                    "K_12(6): 6-regular on 12 vertices"),
+            new TestCase("K13_6",
+                    new int[]{6,6,6,6,6,6,6,6,6,6,6,6,6},
+                    "K_13(6): 6-regular on 13 vertices"),
+            new TestCase("K14_6",
+                    new int[]{6,6,6,6,6,6,6,6,6,6,6,6,6,6},
+                    "K_14(6): 6-regular on 14 vertices"),
+
+
+            // =====================================================================
+            // d = 7  —  7-regular graphs
+            // Note: 7-regular requires n even.
+            // =====================================================================
+            new TestCase("K8_7",
+                    new int[]{7,7,7,7,7,7,7,7},
+                    "K_8(7): 7-regular on 8 vertices"),
+            new TestCase("K10_7",
+                    new int[]{7,7,7,7,7,7,7,7,7,7},
+                    "K_10(7): 7-regular on 10 vertices"),
+            new TestCase("K12_7",
+                    new int[]{7,7,7,7,7,7,7,7,7,7,7,7},
+                    "K_12(7): 7-regular on 12 vertices"),
+            new TestCase("K14_7",
+                    new int[]{7,7,7,7,7,7,7,7,7,7,7,7,7,7},
+                    "K_14(7): 7-regular on 14 vertices"),
 
 
     };

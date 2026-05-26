@@ -76,16 +76,18 @@ public class CpMolgenApiApplication {
 
         // Degree-family groups — mirror paper table row groupings
         String[][] groups = {
-                { "2-Regular Graphs  K_n(2)",
+               /* { "2-Regular Graphs  K_n(2)",
                         "K5_2", "K6_2", "K7_2", "K8_2",  "K9_2", "K10_2", "K11_2", "K12_2", "K13_2", "K14_2", "K15_2", "K16_2" },
-              /*  { "3-Regular Graphs  K_n(3)  [cubic]",
+                { "3-Regular Graphs  K_n(3)  [cubic]",
                         "K6_3", "K8_3", "K10_3", "K12_3", "K14_3" },
                 { "4-Regular Graphs  K_n(4)",
-                        "K8_4", "K9_4", "K10_4", "K11_4", "K12_4" },*/
+                        "K7_4", "K8_4", "K9_4", "K10_4", "K11_4", "K12_4" },
                 { "5-Regular Graphs  K_n(5)",
-                        "K10_5","K12_5" },
-                { "6-Regular Graphs  K_n(6)",
-                        "K12_6" }
+                "K6_5", "K8_5", "K10_5","K12_5" },
+               { "6-Regular Graphs  K_n(6)",
+                        "K6_6" ,"K7_6", "K8_6", "K9_6" , "K10_6" , "K11_6" , "K12_6" , "K14_6" },*/
+                { "7-Regular Graphs  K_n(7)",
+                        "K8_7",  "K10_7",  "K12_7",  "K14_7" }
         };
 
         printColumnHeader();
