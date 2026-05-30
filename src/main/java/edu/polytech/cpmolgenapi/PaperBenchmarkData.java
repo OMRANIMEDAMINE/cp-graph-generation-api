@@ -71,11 +71,30 @@ public class PaperBenchmarkData {
             new TestCase("K16_2",
                     new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
                     "K_16(2): 2-regular on 16 vertices"),
+            new TestCase("K17_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 },
+                    "K_17(2): 2-regular on 17 vertices"),
+
+            new TestCase("K18_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+                    "K_18(2): 2-regular on 18 vertices"),
+
+            new TestCase("K19_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+                    "K_19(2): 2-regular on 19 vertices"),
+
+            new TestCase("K20_2",
+                    new int[]{2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+                    "K_20 (2): 2-regular on 20 vertices"),
 
             // =====================================================================
             // d = 3  —  cubic (3-regular) graphs
             // Note: 3-regular requires n even (n·d must be even).
             // =====================================================================
+            new TestCase("K4_3",
+                    new int[]{ 3, 3, 3, 3},
+                    "K_4(3): 3-regular on 4 vertices  [hybrid boundary: 2d==n, d odd → Lex]"),
+
             new TestCase("K6_3",
                     new int[]{3, 3, 3, 3, 3, 3},
                     "K_6(3): 3-regular on 6 vertices  [hybrid boundary: 2d==n, d odd → Lex]"),
@@ -99,10 +118,13 @@ public class PaperBenchmarkData {
             // =====================================================================
             // d = 4  —  4-regular graphs
             // =====================================================================
+            new TestCase("K6_4",
+                    new int[]{4, 4, 4, 4, 4, 4},
+                    "K_6(4): 4-regular on 6 vertices  [hybrid boundary: 2d==n, d even → RevLex]"),
             new TestCase("K7_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4},
+                    "K_7(4): 4-regular on 7 vertices  [hybrid boundary: 2d==n, d even → RevLex]"),
 
-                    "K_8(4): 4-regular on 8 vertices  [hybrid boundary: 2d==n, d even → RevLex]"),
             new TestCase("K8_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4},
                     "K_8(4): 4-regular on 8 vertices  [hybrid boundary: 2d==n, d even → RevLex]"),
@@ -122,6 +144,14 @@ public class PaperBenchmarkData {
             new TestCase("K12_4",
                     new int[]{4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
                     "K_12(4): 4-regular on 12 vertices"),
+
+            new TestCase("K13_4",
+                    new int[]{4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+                    "K_13(4): 4-regular on 13 vertices"),
+
+            new TestCase("K14_4",
+                    new int[]{4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4},
+                    "K_14(4): 4-regular on 14 vertices"),
 
             // =====================================================================
             // d = 5  —  5-regular graphs
